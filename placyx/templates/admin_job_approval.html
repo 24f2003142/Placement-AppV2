@@ -1,0 +1,62 @@
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}Job Post Approvals | Placyx{% endblock %}
+
+{% block sidebar %}
+    <a href="/admin/dashboard">📊 Dashboard</a>
+    <a href="/admin/companies">🏢 Company Approvals</a>
+    <a href="/admin/job-posts">📄 Approve Job Posts</a>
+    <a href="/admin/students">🎓 Manage Students</a>
+    <a href="/admin/placements">🏆 Placements</a>
+    <a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+    <div class="container mt-5">
+
+        <h2 class="mb-4 text-center">Pending Job Post Approvals</h2>
+
+        {% if job_posts %}
+        <table class="table table-bordered table-hover bg-white">
+            <thead class="table-dark">
+                <tr>
+                    <th>Company</th>
+                    <th>Job Title</th>
+                    <th>Eligibility</th>
+                    <th>Deadline</th>
+                    <th style="width: 180px;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for job in job_posts %}
+                <tr>
+                    <td>{{ job.company.name }}</td>
+                    <td>{{ job.title }}</td>
+                    <td>{{ job.eligibility }}</td>
+                    <td>{{ job.application_deadline }}</td>
+                    <td>
+                        <a
+                        href="{{ url_for('approve_job', job_id=job.id) }}"
+                        class="btn btn-success btn-sm"
+                        >
+                        Approve
+                        </a>
+
+                        <a
+                        href="{{ url_for('reject_job', job_id=job.id) }}"
+                        class="btn btn-danger btn-sm"
+                        >
+                        Reject
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="alert alert-info text-center">
+                No pending job posts for approval.
+            </div>
+        {% endif %}
+
+    </div>
+{% endblock %}

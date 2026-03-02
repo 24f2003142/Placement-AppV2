@@ -1,0 +1,62 @@
+{% extends "layouts/base_dashboard.html" %}
+    {% block title %}My Applications | Placyx{% endblock %}
+
+        {% block sidebar %}
+            {% if current_user.student.profile_photo %}
+                <div class="text-center py-3">
+                    <img src="{{ url_for('static', filename='uploads/' + current_user.student.profile_photo) }}"
+                        class="rounded-circle"
+                        width="100"
+                        height="100"
+                        style="object-fit: cover;">
+                </div>
+                {% else %}
+                <div class="text-center py-3">
+                    <div class="bg-light rounded-circle mx-auto"
+                        style="width:100px; height:100px;"></div>
+                </div>
+            {% endif %}
+        <a href="/student/dashboard">📊 Dashboard</a>
+        <a href="/student/applications">📄 My Applications</a>
+        <a href="/student/profile">⚙ Edit Profile</a>
+        <a href="/logout">🚪 Logout</a>
+        {% endblock %}
+        
+    {% block content %}
+    <h3 class="mb-4 text-center">My Job Applications</h3>
+
+        {% if applications %}
+        <table class="table table-bordered bg-white">
+            <thead class="table-dark">
+                <tr>
+                    <th>Job Title</th>
+                    <th>Company</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for app in applications %}
+                <tr>
+                    <td>{{ app.job_post.title }}</td>
+                    <td>{{ app.job_post.company.name }}</td>
+                    <td>
+                        {% if app.status == "APPLIED" %}
+                            <span class="badge bg-secondary">Applied</span>
+                        {% elif app.status == "SHORTLISTED" %}
+                            <span class="badge bg-warning">Shortlisted</span>
+                        {% elif app.status == "SELECTED" %}
+                            <span class="badge bg-success">Selected</span>
+                        {% else %}
+                            <span class="badge bg-danger">Rejected</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+            <div class="alert alert-info text-center">
+                You have not applied to any jobs yet.
+            </div>
+        {% endif %}
+{% endblock %}

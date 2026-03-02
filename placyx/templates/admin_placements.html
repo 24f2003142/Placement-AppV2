@@ -1,0 +1,50 @@
+
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}Placements | Placyx{% endblock %}
+
+{% block sidebar %}
+<a href="/admin/dashboard">📊 Dashboard</a>
+<a href="/admin/companies">🏢 Company Approvals</a>
+<a href="/admin/job-posts">📄 Approve Job Posts</a>
+<a href="/admin/students">🎓 Manage Students</a>
+<a href="/admin/placements">🏆 Placements</a>
+<a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Placements</h3>
+<div class="container mt-5">
+
+<h3 class="mb-4 text-center">Placed Students</h3>
+
+{% if students %}
+<table class="table table-bordered bg-white">
+    <thead class="table-dark">
+        <tr>
+            <th>Name</th>
+            <th>Roll No</th>
+            <th>Branch</th>
+            <th>Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for student in students %}
+        <tr>
+            <td>{{ student.name }}</td>
+            <td>{{ student.roll_no }}</td>
+            <td>{{ student.branch }}</td>
+            <td>
+                <span class="badge bg-success">Placed</span>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="alert alert-info text-center">
+    No placements recorded yet.
+</div>
+{% endif %}
+
+</div>
+{% endblock %}

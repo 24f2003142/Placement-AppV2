@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Company Registration | Placyx</title>
+
+    <!-- Bootstrap CSS (Allowed) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    >
+
+    <style>
+        body {
+            background: linear-gradient(135deg, #6a0dad, #7f3fbf, #3f51b5);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .company-register-card {
+            width: 100%;
+            max-width: 420px;
+            border-radius: 12px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="card shadow company-register-card">
+    <div class="card-body p-4">
+
+        <h3 class="text-center mb-4 fw-bold text-primary">
+            Company Registration
+        </h3>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="alert alert-danger">{{ messages[0] }}</div>
+            {% endif %}
+            {% endwith %}
+
+            <form method="POST">
+            <input class="form-control mb-2" name="company_name" placeholder="Company Name" required>
+            <input class="form-control mb-2" name="hr_email" type="email" placeholder="HR Email">
+            <input class="form-control mb-2" name="website" placeholder="Website">
+            <input class="form-control mb-2" name="email" type="email" placeholder="Login Email" required>
+            <input class="form-control mb-3" name="password" type="password" placeholder="Password" required>
+
+            <button class="btn btn-primary w-100">Register</button>
+        </form>
+
+    </div>
+</div>
+
+</body>
+</html>

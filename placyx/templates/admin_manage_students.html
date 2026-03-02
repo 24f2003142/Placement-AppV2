@@ -1,0 +1,69 @@
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}Manage Students | Placyx{% endblock %}
+
+{% block sidebar %}
+<a href="/admin/dashboard">📊 Dashboard</a>
+<a href="/admin/companies">🏢 Company Approvals</a>
+<a href="/admin/job-posts">📄 Approve Job Posts</a>
+<a href="/admin/students">🎓 Manage Students</a>
+<a href="/admin/placements">🏆 Placements</a>
+<a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+<h3 class="mb-4">Manage Students</h3>
+<div class="container mt-5">
+
+    <h2 class="mb-4 text-center">Manage Students</h2>
+
+    <table class="table table-bordered table-hover bg-white">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Roll No</th>
+                <th>Branch</th>
+                <th>CGPA</th>
+                <th>Status</th>
+                <th style="width: 160px;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td>{{ student.name }}</td>
+                <td>{{ student.roll_no }}</td>
+                <td>{{ student.branch }}</td>
+                <td>{{ student.cgpa }}</td>
+
+                <td>
+                    {% if student.user.is_active %}
+                        <span class="badge bg-success">Active</span>
+                    {% else %}
+                        <span class="badge bg-danger">Blocked</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if student.user.is_active %}
+                        <a
+                          href="{{ url_for('deactivate_student', student_id=student.id) }}"
+                          class="btn btn-danger btn-sm"
+                        >
+                          Deactivate
+                        </a>
+                    {% else %}
+                        <a
+                          href="{{ url_for('activate_student', student_id=student.id) }}"
+                          class="btn btn-success btn-sm"
+                        >
+                          Activate
+                        </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+</div>
+{% endblock %}

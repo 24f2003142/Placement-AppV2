@@ -1,0 +1,67 @@
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}Applicants | Placyx{% endblock %}
+
+{% block sidebar %}
+    {% if current_user.company.logo %}
+      <div class="text-center py-3">
+          <img src="{{ url_for('static', filename='uploads/' + current_user.company.logo) }}"
+              width="140"
+              class="img-fluid">
+      </div>
+    {% endif %}
+    <a href="/company/dashboard">📊 Dashboard</a>
+    <a href="/company/job/create">➕ Post Job</a>
+    <a href="/company/jobs">📄 My Jobs</a>
+    <a href="/company/profile">⚙ Edit Profile</a>
+    <a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-5">
+
+    <h3 class="mb-4 text-center">Applicants – {{ job.title }}</h3>
+
+    <table class="table table-bordered bg-white">
+      <thead class="table-dark">
+        <tr>
+          <th>Name</th>
+          <th>Branch</th>
+          <th>CGPA</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for app in applications %}
+        <tr>
+          <td>{{ app.student.name }}</td>
+          <td>{{ app.student.branch }}</td>
+          <td>{{ app.student.cgpa }}</td>
+          <td>{{ app.status }}</td>
+          <td>
+          {% if app.status != "SELECTED" and job.status != "CLOSED" %}
+            <a href="/company/application/{{ app.id }}/shortlist"
+              class="btn btn-warning btn-sm">
+              Shortlist
+            </a>
+
+            <a href="/company/application/{{ app.id }}/reject"
+              class="btn btn-danger btn-sm">
+              Reject
+            </a>
+
+            <a href="/company/application/{{ app.id }}/select"
+              class="btn btn-success btn-sm">
+              Select
+            </a>
+          {% else %}
+            <span class="badge bg-secondary">Finalized</span>
+          {% endif %}
+        </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+  </div>
+{% endblock %}
