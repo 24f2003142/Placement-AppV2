@@ -19,5 +19,5 @@ pip install -r requirements.txt
 Start-Process python app.py
 
 # Step 6: Open browser
-Start-Sleep -Seconds 10
+Start-Sleep -Seconds 1
 Start-Process "http://127.0.0.1:5000"

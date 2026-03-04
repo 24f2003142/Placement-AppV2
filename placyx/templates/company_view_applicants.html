@@ -37,29 +37,57 @@
           <td>{{ app.student.name }}</td>
           <td>{{ app.student.branch }}</td>
           <td>{{ app.student.cgpa }}</td>
-          <td>{{ app.status }}</td>
           <td>
-          {% if app.status != "SELECTED" and job.status != "CLOSED" %}
-            <a href="/company/application/{{ app.id }}/shortlist"
-              class="btn btn-warning btn-sm">
-              Shortlist
-            </a>
+            {% if app.status == "SELECTED" %}
+              <span class="badge bg-success">Selected</span>
+            {% elif app.status == "SHORTLISTED" %}
+              <span class="badge bg-info">Shortlisted</span>
+            {% elif app.status == "REJECTED" %}
+              <span class="badge bg-danger">Rejected</span>
+            {% else %}
+              <span class="badge bg-secondary">Applied</span>
+            {% endif %}
+          </td>
+          <td>
+          {% if job.status == "CLOSED" %}
+              <span class="badge bg-secondary">Drive Closed</span>
+          {% else %}
+            {% if app.status == "APPLIED" %}
+              <a href="{{ url_for('shortlist_application', app_id=app.id) }}"
+                class="btn btn-warning btn-sm">
+                Shortlist
+              </a>
 
-            <a href="/company/application/{{ app.id }}/reject"
-              class="btn btn-danger btn-sm">
-              Reject
-            </a>
+              <a href="{{ url_for('reject_application', app_id=app.id) }}"
+                class="btn btn-danger btn-sm">
+                Reject
+              </a>
 
-            <a href="/company/application/{{ app.id }}/select"
-              class="btn btn-success btn-sm">
-              Select
-            </a>
-            <a href="/company/application/{{ app.id }}"
+              <a href="{{ url_for('select_student', app_id=app.id) }}"
+                class="btn btn-success btn-sm">
+                Select
+              </a>
+            {% elif app.status == "SHORTLISTED" %}
+              <a href="{{ url_for('reject_application', app_id=app.id) }}"
+                class="btn btn-danger btn-sm">
+                Reject
+              </a>
+
+              <a href="{{ url_for('select_student', app_id=app.id) }}"
+                class="btn btn-success btn-sm">
+                Select
+              </a>
+              <button class="btn btn-warning btn-sm" disabled>Shortlisted</button>
+            {% elif app.status == "REJECTED" %}
+              <button class="btn btn-danger btn-sm" disabled>Rejected</button>
+            {% elif app.status == "SELECTED" %}
+              <button class="btn btn-success btn-sm" disabled>Selected</button>
+            {% endif %}
+            
+            <a href="{{ url_for('company_view_candidate', app_id=app.id) }}"
               class="btn btn-outline-primary btn-sm">
               View Details
             </a>
-          {% else %}
-              <span class="badge bg-secondary">Drive Closed</span>
           {% endif %}
         </td>
         </tr>
