@@ -271,36 +271,8 @@ def create_app():
         if current_user.role != "ADMIN":
             return "Unauthorized", 403
 
-        query = request.args.get("q", "").strip()
-
-        students_query = Student.query
-        if query:
-            students_query = students_query.filter(
-                (Student.name.ilike(f"%{query}%")) |
-                (Student.roll_no.ilike(f"%{query}%"))
-            )
-
-        students = students_query.all()
-        return render_template("admin_manage_students.html", students=students, q=query)
-
-    @app.route("/admin/manage-companies")
-    @login_required
-    def admin_manage_companies():
-        if current_user.role != "ADMIN":
-            return "Unauthorized", 403
-
-        query = request.args.get("q", "").strip()
-
-        companies_query = Company.query
-        if query:
-            companies_query = companies_query.filter(
-                (Company.name.ilike(f"%{query}%")) |
-                (Company.hr_email.ilike(f"%{query}%")) |
-                (Company.website.ilike(f"%{query}%"))
-            )
-
-        companies = companies_query.all()
-        return render_template("admin_manage_companies.html", companies=companies, q=query)
+        students = Student.query.all()
+        return render_template("admin_manage_students.html", students=students)
     
     @app.route("/admin/student/deactivate/<int:student_id>")
     @login_required
@@ -325,30 +297,6 @@ def create_app():
         db.session.commit()
 
         return redirect(url_for("admin_manage_students"))
-
-    @app.route("/admin/company/deactivate/<int:company_id>")
-    @login_required
-    def deactivate_company(company_id):
-        if current_user.role != "ADMIN":
-            return "Unauthorized", 403
-
-        company = Company.query.get_or_404(company_id)
-        company.user.is_active = False
-        db.session.commit()
-
-        return redirect(url_for("admin_manage_companies"))
-
-    @app.route("/admin/company/activate/<int:company_id>")
-    @login_required
-    def activate_company(company_id):
-        if current_user.role != "ADMIN":
-            return "Unauthorized", 403
-
-        company = Company.query.get_or_404(company_id)
-        company.user.is_active = True
-        db.session.commit()
-
-        return redirect(url_for("admin_manage_companies"))
 
     @app.route("/admin/job-posts")
     @login_required
@@ -774,7 +722,19 @@ def create_app():
         if current_user.role != "ADMIN":
             return "Unauthorized", 403
 
-        return redirect(url_for("admin_manage_companies", q=request.args.get("q", "")))
+        query = request.args.get("q")
+
+        companies = []
+
+        if query:
+            companies = Company.query.filter(
+                Company.name.ilike(f"%{query}%")
+            ).all()
+
+        return render_template(
+            "admin_search_companies.html",
+            companies=companies
+        )
     
     @app.route("/admin/company/<int:id>/toggle")
     @login_required
@@ -789,7 +749,7 @@ def create_app():
 
         db.session.commit()
 
-        return redirect(url_for("admin_manage_companies"))
+        return redirect(url_for("admin_companies"))
 
     
 
