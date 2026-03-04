@@ -17,29 +17,46 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container">
-        <h2 class="mb-4">Welcome, {{ company.name }}</h2>
 
-        <div class="row g-4 mb-4">
-            <div class="col-md-6">
-                <div class="card metric-card p-4 text-center">
-                    <h5>Total Job Posts</h5>
-                    <h2>{{ total_jobs }}</h2>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="card metric-card p-4 text-center">
-                    <h5>Total Applications</h5>
-                    <h2>{{ total_applications }}</h2>
-                </div>
+    <h2 class="mb-4">Company Analytics</h2>
+
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card p-4 text-center">
+                <h6>Total Job Posts</h6>
+                <h2>{{ total_jobs }}</h2>
             </div>
         </div>
-
-        <div class="card p-4">
-            <p class="mb-0 text-muted">
-                All job posts require admin approval before becoming visible to students.
-            </p>
+        <div class="col-md-6">
+            <div class="card p-4 text-center">
+                <h6>Total Applications</h6>
+                <h2>{{ total_applications }}</h2>
+            </div>
         </div>
     </div>
-    
+
+
+    <div class="row g-4">
+                <div class="col-md-12">
+                    <div class="card p-4">
+                        <canvas id="applicationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+    <script>
+    const ctx2 = document.getElementById('applicationChart');
+
+    new Chart(ctx2, {
+        type: 'pie',
+        data: {
+            labels: ['Shortlisted', 'Selected', 'Rejected'],
+            datasets: [{
+                data: [{{ shortlisted }}, {{ selected }}, {{ rejected }}],
+                backgroundColor: ['#7f3fbf', '#3f51b5', '#6a0dad']
+            }]
+        }
+    });
+    </script>
+
 {% endblock %}

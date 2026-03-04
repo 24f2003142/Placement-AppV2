@@ -1,0 +1,68 @@
+{% extends "layouts/base_dashboard.html" %}
+    {% block title %}Job Details{% endblock %}
+
+    {% block sidebar %}
+    <a href="/student/dashboard">📊 Dashboard</a>
+    <a href="/student/applications">📄 My Applications</a>
+    <a href="/student/profile">⚙ Edit Profile</a>
+    <a href="/logout">🚪 Logout</a>
+    {% endblock %}
+
+    {% block content %}
+
+    <a href="{{ back_url }}" class="btn btn-outline-secondary mb-4">
+        ⬅ Back to Dashboard
+    </a>
+
+    <h2 class="mb-4">{{ job.title }}</h2>
+
+    <div class="card p-4 mb-4">
+
+        <div class="row align-items-center">
+
+            <div class="col-md-3 text-center">
+                {% if job.company.logo %}
+                    <img src="{{ url_for('static', filename='uploads/' + job.company.logo) }}"
+                        class="img-fluid"
+                        style="max-height:120px;">
+                {% else %}
+                    <div class="border rounded d-flex align-items-center justify-content-center"
+                        style="height:120px;">
+                        <span class="text-muted">No Logo</span>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="col-md-9">
+                <h5>Company Information</h5>
+                <p><strong>Name:</strong> {{ job.company.name }}</p>
+                <p><strong>Website:</strong> {{ job.company.website }}</p>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="card p-4 mb-4">
+        <h5>Job Description</h5>
+        <p>{{ job.description }}</p>
+    </div>
+
+    <div class="card p-4 mb-4">
+        <h5>Eligibility Criteria</h5>
+        <p>{{ job.eligibility }}</p>
+        <p><strong>Deadline:</strong> {{ job.application_deadline }}</p>
+    </div>
+
+    {% if job.status == "APPROVED" and not current_user.student.is_placed %}
+        <a href="/student/job/apply/{{ job.id }}"
+        class="btn btn-primary">
+        Apply Now
+        </a>
+    {% elif job.status == "CLOSED" %}
+        <span class="badge bg-secondary">Drive Closed</span>
+    {% else %}
+        <span class="badge bg-success">You are already placed</span>
+    {% endif %}
+
+{% endblock %}

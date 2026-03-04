@@ -54,8 +54,12 @@
               class="btn btn-success btn-sm">
               Select
             </a>
+            <a href="/company/application/{{ app.id }}"
+              class="btn btn-outline-primary btn-sm">
+              View Details
+            </a>
           {% else %}
-            <span class="badge bg-secondary">Finalized</span>
+              <span class="badge bg-secondary">Drive Closed</span>
           {% endif %}
         </td>
         </tr>

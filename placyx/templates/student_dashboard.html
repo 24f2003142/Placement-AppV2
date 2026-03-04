@@ -44,6 +44,10 @@
                     <p class="mb-1"><strong>Company:</strong> {{ job.company.name }}</p>
                     <p class="mb-1"><strong>Eligibility:</strong> {{ job.eligibility }}</p>
                     <p class="mb-2"><strong>Deadline:</strong> {{ job.application_deadline }}</p>
+                    <a href="/student/job/{{ job.id }}"
+                    class="btn btn-outline-primary btn-sm">
+                    View Details
+                    </a>
 
                     {% if not current_user.student.is_placed %}
                         <a href="/student/job/apply/{{ job.id }}"

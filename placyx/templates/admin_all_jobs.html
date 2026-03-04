@@ -1,0 +1,42 @@
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}All Placement Drives{% endblock %}
+
+{% block sidebar %}
+        <a href="/admin/dashboard">📊 Dashboard</a>
+        <a href="/admin/companies">🏢 Company Approvals</a>
+        <a href="/admin/job-posts">📄 Approve Job Posts</a>
+        <a href="/admin/students">🎓 Manage Students</a>
+        <a href="/admin/manage-companies">🏢 Manage Companies</a>
+        <a href="/admin/jobs">📄 Placement Drives</a>
+        <a href="/admin/applications">📑 Applications</a>
+        <a href="/admin/placements">🏆 Placements</a>
+        <a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+
+<h2 class="mb-4">Placement Drives</h2>
+
+<table class="table table-bordered bg-white">
+<thead class="table-dark">
+<tr>
+<th>Company</th>
+<th>Job Title</th>
+<th>Status</th>
+<th>Deadline</th>
+</tr>
+</thead>
+
+<tbody>
+{% for job in jobs %}
+<tr>
+<td>{{ job.company.name }}</td>
+<td>{{ job.title }}</td>
+<td>{{ job.status }}</td>
+<td>{{ job.application_deadline }}</td>
+</tr>
+{% endfor %}
+</tbody>
+</table>
+
+{% endblock %}

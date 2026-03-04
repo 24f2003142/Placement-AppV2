@@ -37,6 +37,45 @@
                 <a href="/company/job/{{ job.id }}/applications" class="btn btn-sm btn-primary">
                   View Applicants
                 </a>
+                {% if job.status != "CLOSED" %}
+                  <button class="btn btn-sm btn-danger"
+                          data-bs-toggle="modal"
+                          data-bs-target="#closeModal{{ job.id }}">
+                      Close Drive
+                  </button>
+                  {% else %}
+                  <span class="badge bg-secondary">Closed</span>
+                  {% endif %}
+                  <!-- Modal -->
+                  <div class="modal fade" id="closeModal{{ job.id }}" tabindex="-1">
+                    <div class="modal-dialog">
+                      <div class="modal-content">
+
+                        <div class="modal-header">
+                          <h5 class="modal-title">Confirm Closure</h5>
+                          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                        </div>
+
+                        <div class="modal-body">
+                          Are you sure you want to close this placement drive?
+                          This action cannot be undone.
+                        </div>
+
+                        <div class="modal-footer">
+                          <button type="button" class="btn btn-secondary"
+                                  data-bs-dismiss="modal">
+                            Cancel
+                          </button>
+
+                          <a href="/company/job/{{ job.id }}/close"
+                            class="btn btn-danger">
+                            Confirm Close
+                          </a>
+                        </div>
+
+                      </div>
+                    </div>
+                  </div>
               </td>
             </tr>
             {% endfor %}
@@ -44,4 +83,5 @@
         </table>
       </div>
     </div>
+    
 {% endblock %}

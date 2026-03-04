@@ -7,6 +7,7 @@ from flask_login import login_user, login_required, current_user, logout_user, L
 from werkzeug.security import check_password_hash,generate_password_hash
 from datetime import datetime
 from werkzeug.utils import secure_filename
+from sqlalchemy import func
 
 
 
@@ -113,15 +114,23 @@ def create_app():
 
         total_students = Student.query.count()
         total_companies = Company.query.count()
-        pending_companies = Company.query.filter_by(approval_status="PENDING").count()
         total_jobs = JobPost.query.count()
+
+        placed_students = Student.query.filter_by(is_placed=True).count()
+
+        pending_jobs = JobPost.query.filter_by(status="PENDING").count()
+        approved_jobs = JobPost.query.filter_by(status="APPROVED").count()
+        closed_jobs = JobPost.query.filter_by(status="CLOSED").count()
 
         return render_template(
             "admin_dashboard.html",
             total_students=total_students,
             total_companies=total_companies,
-            pending_companies=pending_companies,
-            total_jobs=total_jobs
+            total_jobs=total_jobs,
+            placed_students=placed_students,
+            pending_jobs=pending_jobs,
+            approved_jobs=approved_jobs,
+            closed_jobs=closed_jobs
         )
     
     @app.route("/admin/placements")
@@ -135,6 +144,7 @@ def create_app():
             "admin_placements.html",
             students=placed_students
         )
+    
 
     
     @app.route("/logout")
@@ -261,8 +271,36 @@ def create_app():
         if current_user.role != "ADMIN":
             return "Unauthorized", 403
 
-        students = Student.query.all()
-        return render_template("admin_manage_students.html", students=students)
+        query = request.args.get("q", "").strip()
+
+        students_query = Student.query
+        if query:
+            students_query = students_query.filter(
+                (Student.name.ilike(f"%{query}%")) |
+                (Student.roll_no.ilike(f"%{query}%"))
+            )
+
+        students = students_query.all()
+        return render_template("admin_manage_students.html", students=students, q=query)
+
+    @app.route("/admin/manage-companies")
+    @login_required
+    def admin_manage_companies():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        query = request.args.get("q", "").strip()
+
+        companies_query = Company.query
+        if query:
+            companies_query = companies_query.filter(
+                (Company.name.ilike(f"%{query}%")) |
+                (Company.hr_email.ilike(f"%{query}%")) |
+                (Company.website.ilike(f"%{query}%"))
+            )
+
+        companies = companies_query.all()
+        return render_template("admin_manage_companies.html", companies=companies, q=query)
     
     @app.route("/admin/student/deactivate/<int:student_id>")
     @login_required
@@ -287,6 +325,30 @@ def create_app():
         db.session.commit()
 
         return redirect(url_for("admin_manage_students"))
+
+    @app.route("/admin/company/deactivate/<int:company_id>")
+    @login_required
+    def deactivate_company(company_id):
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        company = Company.query.get_or_404(company_id)
+        company.user.is_active = False
+        db.session.commit()
+
+        return redirect(url_for("admin_manage_companies"))
+
+    @app.route("/admin/company/activate/<int:company_id>")
+    @login_required
+    def activate_company(company_id):
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        company = Company.query.get_or_404(company_id)
+        company.user.is_active = True
+        db.session.commit()
+
+        return redirect(url_for("admin_manage_companies"))
 
     @app.route("/admin/job-posts")
     @login_required
@@ -324,6 +386,55 @@ def create_app():
         db.session.commit()
 
         return redirect(url_for("admin_job_approvals"))
+    
+    @app.route("/admin/jobs")
+    @login_required
+    def admin_all_jobs():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        jobs = JobPost.query.order_by(JobPost.created_at.desc()).all()
+
+        return render_template(
+            "admin_all_jobs.html",
+            jobs=jobs,
+            back_url=url_for("admin_dashboard")
+        )
+    @app.route("/admin/applications")
+    @login_required
+    def admin_applications():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        applications = Application.query.all()
+
+        return render_template(
+            "admin_applications.html",
+            applications=applications,
+            back_url=url_for("admin_dashboard")
+        )
+    
+    @app.route("/admin/students/search")
+    @login_required
+    def admin_search_students():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        query = request.args.get("q")
+
+        students = []
+
+        if query:
+            students = Student.query.filter(
+                (Student.name.ilike(f"%{query}%")) |
+                (Student.roll_no.ilike(f"%{query}%")) |
+                (Student.contact.ilike(f"%{query}%"))
+            ).all()
+
+        return render_template(
+            "admin_search_students.html",
+            students=students
+        )
 
     @app.route("/company/dashboard")
     @login_required
@@ -333,19 +444,36 @@ def create_app():
 
         company = current_user.company
 
-        total_jobs = JobPost.query.filter_by(company_id=company.id).count()
-        total_applications = (
-            Application.query
-            .join(JobPost)
-            .filter(JobPost.company_id == company.id)
-            .count()
-        )
+        jobs = JobPost.query.filter_by(company_id=company.id).all()
+
+        total_jobs = len(jobs)
+        total_applications = Application.query.join(JobPost).filter(
+            JobPost.company_id == company.id
+        ).count()
+
+        shortlisted = Application.query.join(JobPost).filter(
+            JobPost.company_id == company.id,
+            Application.status == "SHORTLISTED"
+        ).count()
+
+        selected = Application.query.join(JobPost).filter(
+            JobPost.company_id == company.id,
+            Application.status == "SELECTED"
+        ).count()
+
+        rejected = Application.query.join(JobPost).filter(
+            JobPost.company_id == company.id,
+            Application.status == "REJECTED"
+        ).count()
 
         return render_template(
             "company_dashboard.html",
             company=company,
             total_jobs=total_jobs,
-            total_applications=total_applications
+            total_applications=total_applications,
+            shortlisted=shortlisted,
+            selected=selected,
+            rejected=rejected
         )
 
 
@@ -507,7 +635,12 @@ def create_app():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
-        # 🚫 Block placed students
+        job = JobPost.query.get_or_404(job_id)
+
+        # 🚫 Prevent applying to closed jobs
+        if job.status != "APPROVED":
+            return redirect(url_for("student_dashboard"))
+
         if current_user.student.is_placed:
             return redirect(url_for("student_dashboard"))
 
@@ -524,10 +657,29 @@ def create_app():
             job_post_id=job_id,
             status="APPLIED"
         )
+
         db.session.add(application)
         db.session.commit()
 
         return redirect(url_for("student_applications"))
+    
+    @app.route("/student/job/<int:job_id>")
+    @login_required
+    def student_view_job(job_id):
+        if current_user.role != "STUDENT":
+            return "Unauthorized", 403
+
+        job = JobPost.query.filter_by(
+            id=job_id,
+            status="APPROVED",
+            college_id=current_user.student.college_id
+        ).first_or_404()
+
+        return render_template(
+            "student_job_details.html",
+            job=job,
+            back_url=url_for("student_dashboard")
+        )
 
     @app.route("/student/applications")
     @login_required
@@ -582,7 +734,62 @@ def create_app():
         db.session.commit()
 
         return redirect(url_for("view_applicants", job_id=job.id))
+    
+    @app.route("/company/application/<int:app_id>")
+    @login_required
+    def company_view_candidate(app_id):
+        if current_user.role != "COMPANY":
+            return "Unauthorized", 403
 
+        application = Application.query.get_or_404(app_id)
+
+        if application.job_post.company_id != current_user.company.id:
+            return "Unauthorized", 403
+
+        return render_template(
+            "company_candidate_details.html",
+            application=application,
+            back_url=url_for("view_applicants", job_id=application.job_post_id)
+        )
+
+    @app.route("/company/job/<int:job_id>/close")
+    @login_required
+    def close_job(job_id):
+        if current_user.role != "COMPANY":
+            return "Unauthorized", 403
+
+        job = JobPost.query.get_or_404(job_id)
+
+        if job.company_id != current_user.company.id:
+            return "Unauthorized", 403
+
+        job.status = "CLOSED"
+        db.session.commit()
+
+        return redirect(url_for("company_jobs"))
+    
+    @app.route("/admin/companies/search")
+    @login_required
+    def admin_search_companies():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        return redirect(url_for("admin_manage_companies", q=request.args.get("q", "")))
+    
+    @app.route("/admin/company/<int:id>/toggle")
+    @login_required
+    def toggle_company(id):
+
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        company = Company.query.get_or_404(id)
+
+        company.user.is_active = not company.user.is_active
+
+        db.session.commit()
+
+        return redirect(url_for("admin_manage_companies"))
 
     
 

@@ -1,0 +1,72 @@
+{% extends "layouts/base_dashboard.html" %}
+{% block title %}Candidate Details{% endblock %}
+
+{% block sidebar %}
+<a href="/company/dashboard">📊 Dashboard</a>
+<a href="/company/jobs">📄 My Jobs</a>
+<a href="/company/profile">⚙ Edit Profile</a>
+<a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+
+<a href="{{ back_url }}" class="btn btn-outline-secondary mb-4">
+    ⬅ Back to Applicants
+</a>
+
+<h2 class="mb-4">Candidate Details</h2>
+
+<div class="card p-4 mb-4">
+
+    <div class="row align-items-center">
+
+        <div class="col-md-3 text-center">
+            {% if application.student.profile_photo %}
+                <img src="{{ url_for('static', filename='uploads/' + application.student.profile_photo) }}"
+                     class="rounded-circle"
+                     width="120"
+                     height="120"
+                     style="object-fit: cover;">
+            {% else %}
+                <div class="border rounded-circle d-flex align-items-center justify-content-center"
+                     style="width:120px; height:120px;">
+                    <span class="text-muted">No Photo</span>
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="col-md-9">
+            <p><strong>Name:</strong> {{ application.student.name }}</p>
+            <p><strong>Roll No:</strong> {{ application.student.roll_no }}</p>
+            <p><strong>Branch:</strong> {{ application.student.branch }}</p>
+            <p><strong>CGPA:</strong> {{ application.student.cgpa }}</p>
+        </div>
+
+    </div>
+
+</div>
+
+<div class="card p-4 mb-4">
+    <p><strong>Application Status:</strong> {{ application.status }}</p>
+</div>
+
+{% if application.job_post.status != "CLOSED" %}
+<a href="/company/application/{{ application.id }}/shortlist"
+   class="btn btn-warning">
+   Shortlist
+</a>
+
+<a href="/company/application/{{ application.id }}/select"
+   class="btn btn-success">
+   Select
+</a>
+
+<a href="/company/application/{{ application.id }}/reject"
+   class="btn btn-danger">
+   Reject
+</a>
+{% else %}
+<span class="badge bg-secondary">Job Closed</span>
+{% endif %}
+
+{% endblock %}
