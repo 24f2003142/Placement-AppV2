@@ -5,7 +5,7 @@ Placyx is a web-based placement management system designed to streamline the cam
 The application automates the placement workflow from company registration and job posting to student applications, candidate selection, and placement tracking.
 
 The system is implemented using Flask, SQLAlchemy, and SQLite, with a responsive interface built using Bootstrap and Jinja2 templates.
-
+---
 ## Key Features
 Role-Based Access System
 
@@ -32,20 +32,14 @@ The platform supports three different user roles:
 - Update company profile and logo
 
 # Student
-
-Register and create profile
-
-Upload resume and profile photo
-
-Browse available placement drives
-
-View job details and company information
-
-Apply for placement drives
-
-Track application status
-
-Placement Workflow
+- Register and create profile
+- Upload resume and profile photo
+- Browse available placement drives
+- View job details and company information
+- Apply for placement drives
+- Track application status
+---
+##  Placement Workflow
 
 The application models the real campus recruitment lifecycle:
 
@@ -61,7 +55,7 @@ Company Registration
 
 ---
 
-# Project Structure
+## Project Structure
 ```bash
 
 Placement-App/
