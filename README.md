@@ -1,81 +1,62 @@
-Placyx – Placement Management Portal
+### Placyx – Placement Management Portal
 
 Placyx is a web-based placement management system designed to streamline the campus recruitment process by connecting students, companies, and administrators on a single platform.
 
 The application automates the placement workflow from company registration and job posting to student applications, candidate selection, and placement tracking.
 
 The system is implemented using Flask, SQLAlchemy, and SQLite, with a responsive interface built using Bootstrap and Jinja2 templates.
-
-Key Features
+---
+## Key Features
 Role-Based Access System
 
 The platform supports three different user roles:
 
-Administrator
+# Administrator
 
-Approve or reject company registrations
+- Approve or reject company registrations
+- Approve or reject job posts
+- View all placement drives
+- View all student applications
+- Search students and companies
+- Deactivate or reactivate accounts
+- Monitor placement statistics
 
-Approve or reject job posts
+# Company
+- Register company account
+- Post placement drives
+- View job applicants
+- View candidate profiles
+- Shortlist or reject applicants
+- Select final candidates
+- Close placement drives
+- Update company profile and logo
 
-View all placement drives
-
-View all student applications
-
-Search students and companies
-
-Deactivate or reactivate accounts
-
-Monitor placement statistics
-
-Company
-
-Register company account
-
-Post placement drives
-
-View job applicants
-
-View candidate profiles
-
-Shortlist or reject applicants
-
-Select final candidates
-
-Close placement drives
-
-Update company profile and logo
-
-Student
-
-Register and create profile
-
-Upload resume and profile photo
-
-Browse available placement drives
-
-View job details and company information
-
-Apply for placement drives
-
-Track application status
-
-Placement Workflow
+# Student
+- Register and create profile
+- Upload resume and profile photo
+- Browse available placement drives
+- View job details and company information
+- Apply for placement drives
+- Track application status
+---
+##  Placement Workflow
 
 The application models the real campus recruitment lifecycle:
 
 Company Registration
-→ Admin Approval
-→ Company Posts Job
-→ Admin Approves Job Post
-→ Students View and Apply
-→ Company Shortlists Candidates
-→ Company Selects Candidate
-→ Student Marked as Placed
-→ Placement Drive Closed
+-→ Admin Approval
+-→ Company Posts Job
+-→ Admin Approves Job Post
+-→ Students View and Apply
+-→ Company Shortlists Candidates
+-→ Company Selects Candidate
+-→ Student Marked as Placed
+-→ Placement Drive Closed
 
 ---
 
-# Project Structure
+## Project Structure
+```bash
 
 Placement-App/
 │
@@ -119,10 +100,11 @@ Placement-App/
 │
 └──README.md
 
-
+```
 ---
 
 # Technologies Used
+
 
 | Technology    | Purpose                                   |
 |---------------|-------------------------------------------|
@@ -162,9 +144,58 @@ Relationships include:
 ## 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/24f2003142/Placement-App.git
 cd Placement-App/placyx
 ./local.psi
+```
 
 - These commands will launch create venv download necessary dependencies create database and launch the web application
+---
 
+## Default Admin Account
+
+When the database initializes, a default admin account is automatically created.
+
+# Email
+```bash
+admin@placyx.com
+```
+# Password
+```bash
+admin123
+```
+---
+## File Uploads
+
+Uploaded files are stored in:
+```bash
+static/uploads/
+```
+These include:
+- Student profile photos
+- Student resumes
+- Company logos
+
+---
+
+## Security Features
+
+- Password hashing using Werkzeug
+- Role-based authorization
+- Login session protection using Flask-Login
+- Restricted access to protected routes
+- Prevention of duplicate job applications
+
+---
+## Future Improvements
+Potential enhancements include:
+- Resume parsing and candidate ranking
+- Email notifications for job updates
+- Multi-college deployment support
+- AI-based candidate-job matching
+- Cloud deployment and containerization
+
+---
+### Author
+
+## Mridul Goyal
