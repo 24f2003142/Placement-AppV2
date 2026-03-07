@@ -37,7 +37,18 @@
     <input type="password" class="form-control mb-3" name="password">
 
     <label>Profile Photo</label>
-    <input type="file" class="form-control mb-3" name="photo">
+    <input type="file" class="form-control mb-3" name="photo" accept=".jpg,.jpeg,.png">
+
+    <div class="form-group">
+    <label for="resume">Resume Upload</label>
+    <input
+      type="file"
+      id="resume"
+      name="resume"
+      class="form-control"
+      accept=".pdf,.doc,.docx"
+    />
+    <div><label for="spacing"> </label></div>
 
     <button class="btn btn-primary">Save Changes</button>
 

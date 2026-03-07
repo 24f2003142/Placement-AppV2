@@ -346,6 +346,7 @@ def create_app():
 
         company = Company.query.get_or_404(company_id)
         company.user.is_active = True
+        company.approval_status = "APPROVED"
         db.session.commit()
 
         return redirect(url_for("admin_manage_companies"))
@@ -428,7 +429,8 @@ def create_app():
             students = Student.query.filter(
                 (Student.name.ilike(f"%{query}%")) |
                 (Student.roll_no.ilike(f"%{query}%")) |
-                (Student.contact.ilike(f"%{query}%"))
+                (Student.branch.ilike(f"%{query}%")) |
+                (func.cast(Student.cgpa, db.String).ilike(f"%{query}%"))
             ).all()
 
         return render_template(
@@ -655,10 +657,17 @@ def create_app():
             # Photo upload
             file = request.files.get("photo")
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
+                filename = student.name+student.roll_no+secure_filename(file.filename)
                 file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
                 file.save(file_path)
                 student.profile_photo = filename
+
+            file2 = request.files.get("resume")
+            if file2:
+                filename = student.name+student.roll_no+secure_filename(file2.filename)
+                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                file2.save(file_path)
+                student.resume_path = filename
 
             db.session.commit()
             return redirect(url_for("student_dashboard"))
