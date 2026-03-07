@@ -1,4 +1,4 @@
-Placyx – Placement Management Portal
+### Placyx – Placement Management Portal
 
 Placyx is a web-based placement management system designed to streamline the campus recruitment process by connecting students, companies, and administrators on a single platform.
 
@@ -6,46 +6,32 @@ The application automates the placement workflow from company registration and j
 
 The system is implemented using Flask, SQLAlchemy, and SQLite, with a responsive interface built using Bootstrap and Jinja2 templates.
 
-Key Features
+## Key Features
 Role-Based Access System
 
 The platform supports three different user roles:
 
-Administrator
+# Administrator
 
-Approve or reject company registrations
+- Approve or reject company registrations
+- Approve or reject job posts
+- View all placement drives
+- View all student applications
+- Search students and companies
+- Deactivate or reactivate accounts
+- Monitor placement statistics
 
-Approve or reject job posts
+# Company
+- Register company account
+- Post placement drives
+- View job applicants
+- View candidate profiles
+- Shortlist or reject applicants
+- Select final candidates
+- Close placement drives
+- Update company profile and logo
 
-View all placement drives
-
-View all student applications
-
-Search students and companies
-
-Deactivate or reactivate accounts
-
-Monitor placement statistics
-
-Company
-
-Register company account
-
-Post placement drives
-
-View job applicants
-
-View candidate profiles
-
-Shortlist or reject applicants
-
-Select final candidates
-
-Close placement drives
-
-Update company profile and logo
-
-Student
+# Student
 
 Register and create profile
 
@@ -64,18 +50,19 @@ Placement Workflow
 The application models the real campus recruitment lifecycle:
 
 Company Registration
-→ Admin Approval
-→ Company Posts Job
-→ Admin Approves Job Post
-→ Students View and Apply
-→ Company Shortlists Candidates
-→ Company Selects Candidate
-→ Student Marked as Placed
-→ Placement Drive Closed
+-→ Admin Approval
+-→ Company Posts Job
+-→ Admin Approves Job Post
+-→ Students View and Apply
+-→ Company Shortlists Candidates
+-→ Company Selects Candidate
+-→ Student Marked as Placed
+-→ Placement Drive Closed
 
 ---
 
 # Project Structure
+```bash
 
 Placement-App/
 │
@@ -119,10 +106,11 @@ Placement-App/
 │
 └──README.md
 
-
+```
 ---
 
 # Technologies Used
+
 
 | Technology    | Purpose                                   |
 |---------------|-------------------------------------------|
@@ -162,9 +150,10 @@ Relationships include:
 ## 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/24f2003142/Placement-App.git
 cd Placement-App/placyx
 ./local.psi
+```
 
 - These commands will launch create venv download necessary dependencies create database and launch the web application
 
