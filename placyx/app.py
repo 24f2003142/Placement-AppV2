@@ -608,7 +608,7 @@ def create_app():
 
             file = request.files.get("logo")
             if file and allowed_file(file.filename):
-                filename = secure_filename(file.filename)
+                filename = str(company.name) + "_" + secure_filename(file.filename)
                 file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
                 file.save(file_path)
                 company.logo = filename
