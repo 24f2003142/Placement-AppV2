@@ -150,4 +150,52 @@ cd Placement-App/placyx
 ```
 
 - These commands will launch create venv download necessary dependencies create database and launch the web application
+---
 
+## Default Admin Account
+
+When the database initializes, a default admin account is automatically created.
+
+# Email
+```bash
+admin@placyx.com
+```
+# Password
+```bash
+admin123
+```
+---
+## File Uploads
+
+Uploaded files are stored in:
+```bash
+static/uploads/
+```
+These include:
+- Student profile photos
+- Student resumes
+- Company logos
+
+---
+
+## Security Features
+
+- Password hashing using Werkzeug
+- Role-based authorization
+- Login session protection using Flask-Login
+- Restricted access to protected routes
+- Prevention of duplicate job applications
+
+---
+## Future Improvements
+Potential enhancements include:
+- Resume parsing and candidate ranking
+- Email notifications for job updates
+- Multi-college deployment support
+- AI-based candidate-job matching
+- Cloud deployment and containerization
+
+---
+### Author
+
+## Mridul Goyal
