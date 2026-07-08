@@ -10,59 +10,105 @@
 
     {% block content %}
 
-    <a href="{{ back_url }}" class="btn btn-outline-secondary mb-4">
-        ⬅ Back to Dashboard
-    </a>
+    <div id="job-details-app">
+        <a href="{{ back_url }}" class="btn btn-outline-secondary mb-4">
+            ⬅ Back to Dashboard
+        </a>
 
-    <h2 class="mb-4">{{ job.title }}</h2>
+        <h2 class="mb-4">{{ job.title }}</h2>
 
-    <div class="card p-4 mb-4">
+        <div class="card p-4 mb-4">
 
-        <div class="row align-items-center">
+            <div class="row align-items-center">
 
-            <div class="col-md-3 text-center">
-                {% if job.company.logo %}
-                    <img src="{{ url_for('static', filename='uploads/' + job.company.logo) }}"
-                        class="img-fluid"
-                        style="max-height:120px;">
-                {% else %}
-                    <div class="border rounded d-flex align-items-center justify-content-center"
-                        style="height:120px;">
-                        <span class="text-muted">No Logo</span>
-                    </div>
-                {% endif %}
-            </div>
+                <div class="col-md-3 text-center">
+                    {% if job.company.logo %}
+                        <img src="{{ url_for('static', filename='uploads/' + job.company.logo) }}"
+                            class="img-fluid"
+                            style="max-height:120px;">
+                    {% else %}
+                        <div class="border rounded d-flex align-items-center justify-content-center"
+                            style="height:120px;">
+                            <span class="text-muted">No Logo</span>
+                        </div>
+                    {% endif %}
+                </div>
 
-            <div class="col-md-9">
-                <h5>Company Information</h5>
-                <p><strong>Name:</strong> {{ job.company.name }}</p>
-                <p><strong>Website:</strong> {{ job.company.website }}</p>
+                <div class="col-md-9">
+                    <h5>Company Information</h5>
+                    <p><strong>Name:</strong> {{ job.company.name }}</p>
+                    <p><strong>Website:</strong> {{ job.company.website }}</p>
+                </div>
+
             </div>
 
         </div>
 
+        <div class="card p-4 mb-4">
+            <h5>Job Description</h5>
+            <p>{{ job.description }}</p>
+        </div>
+
+        <div class="card p-4 mb-4">
+            <h5>Eligibility Criteria</h5>
+            <p>{{ job.eligibility }}</p>
+            <p><strong>Deadline:</strong> {{ job.application_deadline }}</p>
+        </div>
+
+        {% if job.status == "APPROVED" and not current_user.student.is_placed %}
+            <div v-if="!applied" class="d-flex align-items-center gap-2">
+                <button type="button" class="btn btn-primary" @click="applyJob" :disabled="loading">
+                    {% raw %}{{ loading ? 'Applying...' : 'Apply Now' }}{% endraw %}
+                </button>
+            </div>
+            <div v-else>
+                <span class="badge bg-success">Applied</span>
+            </div>
+            <div v-if="message" class="alert alert-success mt-3 mb-0" role="alert">
+                {% raw %}{{ message }}{% endraw %}
+            </div>
+        {% elif job.status == "CLOSED" %}
+            <span class="badge bg-secondary">Drive Closed</span>
+        {% else %}
+            <span class="badge bg-success">You are already placed</span>
+        {% endif %}
     </div>
 
-    <div class="card p-4 mb-4">
-        <h5>Job Description</h5>
-        <p>{{ job.description }}</p>
-    </div>
-
-    <div class="card p-4 mb-4">
-        <h5>Eligibility Criteria</h5>
-        <p>{{ job.eligibility }}</p>
-        <p><strong>Deadline:</strong> {{ job.application_deadline }}</p>
-    </div>
-
-    {% if job.status == "APPROVED" and not current_user.student.is_placed %}
-        <a href="/student/job/apply/{{ job.id }}"
-        class="btn btn-primary">
-        Apply Now
-        </a>
-    {% elif job.status == "CLOSED" %}
-        <span class="badge bg-secondary">Drive Closed</span>
-    {% else %}
-        <span class="badge bg-success">You are already placed</span>
-    {% endif %}
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    applied: {{ 'true' if has_applied else 'false' }},
+                    loading: false,
+                    message: {{ ('You have already applied for this job.' if has_applied else '')|tojson }}
+                };
+            },
+            methods: {
+                async applyJob() {
+                    this.loading = true;
+                    this.message = '';
+                    try {
+                        const response = await fetch(`/student/job/apply/{{ job.id }}`, {
+                            method: 'POST',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await response.json();
+                        if (response.ok && data.success) {
+                            this.applied = true;
+                            this.message = data.message || 'You have applied successfully for this job.';
+                        } else {
+                            this.message = data.message || 'Unable to apply right now.';
+                        }
+                    } catch (error) {
+                        this.message = 'Unable to apply right now.';
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }).mount('#job-details-app');
+    </script>
 
 {% endblock %}

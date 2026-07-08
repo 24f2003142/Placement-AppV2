@@ -68,22 +68,77 @@
 
 
 {% if application.job_post.status != "CLOSED" %}
-<a href="/company/application/{{ application.id }}/shortlist"
-   class="btn btn-warning">
-   Shortlist
-</a>
+<div id="company-candidate-details-app" class="d-flex gap-2 align-items-center" data-back-url="{{ back_url }}">
+  <button @click="updateStatus('SHORTLISTED')" :disabled="loading" class="btn btn-warning">
+    <span v-text="loading && action === 'SHORTLISTED' ? 'Working…' : 'Shortlist'"></span>
+  </button>
 
-<a href="/company/application/{{ application.id }}/select"
-   class="btn btn-success">
-   Select
-</a>
+  <button @click="updateStatus('SELECTED')" :disabled="loading" class="btn btn-success">
+    <span v-text="loading && action === 'SELECTED' ? 'Working…' : 'Select'"></span>
+  </button>
 
-<a href="/company/application/{{ application.id }}/reject"
-   class="btn btn-danger">
-   Reject
-</a>
+  <button @click="updateStatus('REJECTED')" :disabled="loading" class="btn btn-danger">
+    <span v-text="loading && action === 'REJECTED' ? 'Working…' : 'Reject'"></span>
+  </button>
+</div>
+
+<div v-if="message" class="alert mt-3" :class="messageType === 'success' ? 'alert-success' : 'alert-danger'">
+  <span v-text="message"></span>
+</div>
 {% else %}
 <span class="badge bg-secondary">Job Closed</span>
 {% endif %}
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  const { createApp } = Vue;
+  const app = createApp({
+    data() {
+      const root = document.getElementById('company-candidate-details-app');
+      return {
+        loading: false,
+        action: null,
+        message: '',
+        messageType: 'success',
+        backUrl: root ? root.dataset.backUrl : '/company/jobs'
+      };
+    },
+    methods: {
+      async updateStatus(status) {
+        this.loading = true;
+        this.action = status;
+        this.message = '';
+
+        try {
+          const response = await fetch(`/company/application/{{ application.id }}/${status.toLowerCase()}`, {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            this.message = data.message || 'Status updated successfully.';
+            this.messageType = 'success';
+            setTimeout(() => {
+              window.location.href = this.backUrl;
+            }, 500);
+          } else {
+            this.message = data.message || 'Failed to update status.';
+            this.messageType = 'error';
+          }
+        } catch (error) {
+          this.message = 'Unable to update status.';
+          this.messageType = 'error';
+        } finally {
+          this.loading = false;
+          this.action = null;
+        }
+      }
+    }
+  });
+  const candidateAppRoot = document.getElementById('company-candidate-details-app');
+  if (candidateAppRoot) {
+    app.mount(candidateAppRoot);
+  }
+</script>
 
 {% endblock %}

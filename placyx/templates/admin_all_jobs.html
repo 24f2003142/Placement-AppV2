@@ -14,29 +14,52 @@
 {% endblock %}
 
 {% block content %}
+<div id="placement-drives-app" class="container mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Placement Drives</h2>
+        <input v-model="searchQuery" class="form-control" style="max-width: 260px;" placeholder="Search drives">
+    </div>
+    <div class="small text-muted mb-3">{{ jobs|length }} total drives</div>
 
-<h2 class="mb-4">Placement Drives</h2>
+    <table class="table table-bordered bg-white">
+    <thead class="table-dark">
+    <tr>
+    <th>Company</th>
+    <th>Job Title</th>
+    <th>Status</th>
+    <th>Deadline</th>
+    </tr>
+    </thead>
 
-<table class="table table-bordered bg-white">
-<thead class="table-dark">
-<tr>
-<th>Company</th>
-<th>Job Title</th>
-<th>Status</th>
-<th>Deadline</th>
-</tr>
-</thead>
+    <tbody>
+    {% for job in jobs %}
+    <tr v-show='matchesJob({{ job.company.name|tojson }}, {{ job.title|tojson }}, {{ job.status|tojson }}, {{ job.application_deadline|tojson }})'>
+    <td>{{ job.company.name }}</td>
+    <td>{{ job.title }}</td>
+    <td>{{ job.status }}</td>
+    <td>{{ job.application_deadline }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+</div>
 
-<tbody>
-{% for job in jobs %}
-<tr>
-<td>{{ job.company.name }}</td>
-<td>{{ job.title }}</td>
-<td>{{ job.status }}</td>
-<td>{{ job.application_deadline }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                searchQuery: ''
+            };
+        },
+        methods: {
+            matchesJob(company, title, status, deadline) {
+                const query = this.searchQuery.trim().toLowerCase();
+                if (!query) return true;
+                return [company, title, status, deadline].some(value => String(value).toLowerCase().includes(query));
+            }
+        }
+    }).mount('#placement-drives-app');
+</script>
 {% endblock %}

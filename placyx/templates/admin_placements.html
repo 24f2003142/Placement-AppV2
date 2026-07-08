@@ -15,39 +15,60 @@
 {% endblock %}
 
 {% block content %}
-<h3 class="mb-4">Placements</h3>
-<div class="container mt-5">
+<div id="placements-app" class="container mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Placements</h3>
+        <input v-model="searchQuery" class="form-control" style="max-width: 260px;" placeholder="Search students">
+    </div>
 
-<h3 class="mb-4 text-center">Placed Students</h3>
+    <h3 class="mb-4 text-center">Placed Students</h3>
 
-{% if students %}
-<table class="table table-bordered bg-white">
-    <thead class="table-dark">
-        <tr>
-            <th>Name</th>
-            <th>Roll No</th>
-            <th>Branch</th>
-            <th>Status</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for student in students %}
-        <tr>
-            <td>{{ student.name }}</td>
-            <td>{{ student.roll_no }}</td>
-            <td>{{ student.branch }}</td>
-            <td>
-                <span class="badge bg-success">Placed</span>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<div class="alert alert-info text-center">
-    No placements recorded yet.
+    {% if students %}
+    <table class="table table-bordered bg-white">
+        <thead class="table-dark">
+            <tr>
+                <th>Name</th>
+                <th>Roll No</th>
+                <th>Branch</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr v-show='matchesStudent({{ student.name|tojson }}, {{ student.roll_no|tojson }}, {{ student.branch|tojson }})'>
+                <td>{{ student.name }}</td>
+                <td>{{ student.roll_no }}</td>
+                <td>{{ student.branch }}</td>
+                <td>
+                    <span class="badge bg-success">Placed</span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="alert alert-info text-center">
+        No placements recorded yet.
+    </div>
+    {% endif %}
 </div>
-{% endif %}
 
-</div>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                searchQuery: ''
+            };
+        },
+        methods: {
+            matchesStudent(name, rollNo, branch) {
+                const query = this.searchQuery.trim().toLowerCase();
+                if (!query) return true;
+                return [name, rollNo, branch].some(value => String(value).toLowerCase().includes(query));
+            }
+        }
+    }).mount('#placements-app');
+</script>
 {% endblock %}

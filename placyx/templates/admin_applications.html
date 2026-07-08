@@ -13,30 +13,64 @@
         <a href="/logout">🚪 Logout</a>
 {% endblock %}
 {% block content %}
+<div id="applications-app" class="container mt-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">All Applications</h2>
+        <div class="d-flex gap-2">
+            <input v-model="searchQuery" class="form-control" style="max-width: 240px;" placeholder="Search applications">
+            <select v-model="statusFilter" class="form-select" style="max-width: 180px;">
+                <option value="">All statuses</option>
+                <option value="PENDING">Pending</option>
+                <option value="SHORTLISTED">Shortlisted</option>
+                <option value="SELECTED">Selected</option>
+                <option value="REJECTED">Rejected</option>
+            </select>
+        </div>
+    </div>
+    <div class="small text-muted mb-3">{{ applications|length }} total applications</div>
 
+    <table class="table table-bordered bg-white">
+    <thead class="table-dark">
+    <tr>
+    <th>Student</th>
+    <th>Company</th>
+    <th>Job</th>
+    <th>Status</th>
+    </tr>
+    </thead>
 
-<h2 class="mb-4">All Applications</h2>
+    <tbody>
+    {% for app in applications %}
+    <tr v-show='matchesApplication({{ app.student.name|tojson }}, {{ app.job_post.company.name|tojson }}, {{ app.job_post.title|tojson }}, {{ app.status|tojson }})'>
+    <td>{{ app.student.name }}</td>
+    <td>{{ app.job_post.company.name }}</td>
+    <td>{{ app.job_post.title }}</td>
+    <td>{{ app.status }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+    </table>
+</div>
 
-<table class="table table-bordered bg-white">
-<thead class="table-dark">
-<tr>
-<th>Student</th>
-<th>Company</th>
-<th>Job</th>
-<th>Status</th>
-</tr>
-</thead>
-
-<tbody>
-{% for app in applications %}
-<tr>
-<td>{{ app.student.name }}</td>
-<td>{{ app.job_post.company.name }}</td>
-<td>{{ app.job_post.title }}</td>
-<td>{{ app.status }}</td>
-</tr>
-{% endfor %}
-</tbody>
-</table>
-
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+    const { createApp } = Vue;
+    createApp({
+        data() {
+            return {
+                searchQuery: '',
+                statusFilter: ''
+            };
+        },
+        methods: {
+            matchesApplication(student, company, job, status) {
+                const query = this.searchQuery.trim().toLowerCase();
+                const statusMatch = !this.statusFilter || status === this.statusFilter;
+                if (!query) return statusMatch;
+                const haystack = [student, company, job, status].join(' ').toLowerCase();
+                return statusMatch && haystack.includes(query);
+            }
+        }
+    }).mount('#applications-app');
+</script>
 {% endblock %}

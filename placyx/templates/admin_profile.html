@@ -1,0 +1,53 @@
+{% extends "layouts/base_dashboard.html" %}
+
+{% block title %}Admin Profile | Placyx{% endblock %}
+
+{% block sidebar %}
+    <a href="/admin/dashboard">📊 Dashboard</a>
+    <a href="/admin/companies">🏢 Company Approvals</a>
+    <a href="/admin/job-posts">📄 Approve Job Posts</a>
+    <a href="/admin/students">🎓 Manage Students</a>
+    <a href="/admin/manage-companies">🏢 Manage Companies</a>
+    <a href="/admin/jobs">📄 Placement Drives</a>
+    <a href="/admin/applications">📑 Applications</a>
+    <a href="/admin/placements">🏆 Placements</a>
+    <a href="/admin/profile">⚙ Edit Profile</a>
+    <a href="/logout">🚪 Logout</a>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 700px;">
+    <div class="card p-4">
+        <h3 class="mb-4">Admin Profile</h3>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}" role="alert">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="POST" action="{{ url_for('admin_profile') }}">
+            <div class="mb-3">
+                <label class="form-label">Notification Email</label>
+                <input type="email" name="notification_email" value="{{ admin.notification_email or '' }}" class="form-control" placeholder="Enter email for reports and reminders">
+            </div>
+
+            <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" id="receiveNotifications" name="receive_notifications" {% if admin.receive_notifications %}checked{% endif %}>
+                <label class="form-check-label" for="receiveNotifications">Receive notifications</label>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Change Password</label>
+                <input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password">
+            </div>
+
+            <button type="submit" class="btn btn-primary">Save Profile</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

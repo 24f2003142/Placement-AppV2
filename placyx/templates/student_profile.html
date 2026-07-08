@@ -23,34 +23,226 @@
         <a href="/logout">🚪 Logout</a>
         {% endblock %}
 {% block content %}
-<h3>Edit Profile</h3>
+<div class="container mt-4" id="student-profile-app">
+  <div class="card p-4 mx-auto" style="max-width: 650px;">
+    <h3 class="mb-3">Edit Profile</h3>
 
-<form method="POST" enctype="multipart/form-data" class="card p-4">
+    <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-danger']" role="alert">
+      {% raw %}{{ message }}{% endraw %}
+    </div>
 
-    <label>Branch</label>
-    <input class="form-control mb-3" name="branch" value="{{ student.branch }}">
+    <form @submit.prevent="submitProfile" enctype="multipart/form-data">
+      <label>Branch</label>
+      <input v-model="form.branch" class="form-control mb-3" name="branch">
 
-    <label>CGPA</label>
-    <input class="form-control mb-3" name="cgpa" value="{{ student.cgpa }}">
+      <label>CGPA</label>
+      <input v-model="form.cgpa" class="form-control mb-3" name="cgpa">
 
-    <label>New Password</label>
-    <input type="password" class="form-control mb-3" name="password">
+      <label>New Password</label>
+      <input v-model="form.password" type="password" class="form-control mb-3" name="password" placeholder="Leave blank to keep current password">
 
-    <label>Profile Photo</label>
-    <input type="file" class="form-control mb-3" name="photo" accept=".jpg,.jpeg,.png">
+      <label>Notification Email</label>
+      <input v-model="form.notification_email" type="email" class="form-control mb-3" name="notification_email" placeholder="Enter email for notifications">
 
-    <div class="form-group">
-    <label for="resume">Resume Upload</label>
-    <input
-      type="file"
-      id="resume"
-      name="resume"
-      class="form-control"
-      accept=".pdf,.doc,.docx"
-    />
-    <div><label for="spacing"> </label></div>
+      <div class="form-check mb-3">
+        <input class="form-check-input" type="checkbox" id="receiveNotifications" v-model="form.receive_notifications" name="receive_notifications">
+        <label class="form-check-label" for="receiveNotifications">Receive notifications</label>
+      </div>
 
-    <button class="btn btn-primary">Save Changes</button>
+      <label>Profile Photo</label>
+      <div v-if="currentPhoto" class="mb-2">
+        <p class="text-muted small">Current Photo:</p>
+        <img :src="currentPhoto" class="img-fluid mb-3" style="max-width: 180px;">
+      </div>
+      <input @change="previewImage" type="file" class="form-control mb-3" name="photo" accept="image/*">
+      <div v-if="previewUrl" class="mb-3">
+        <p class="text-muted small">New Photo Preview:</p>
+        <img :src="previewUrl" class="img-fluid" style="max-width: 180px;">
+      </div>
 
-</form>
+      <label for="resume">Resume Upload</label>
+      <input
+        @change="selectResume"
+        type="file"
+        id="resume"
+        name="resume"
+        class="form-control mb-3"
+        accept=".pdf,.doc,.docx"
+      />
+
+      <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+        {% raw %}{{ loading ? 'Saving...' : 'Save Changes' }}{% endraw %}
+      </button>
+    </form>
+
+    <div class="mt-4">
+      <button type="button" class="btn btn-secondary w-100 mb-3" :disabled="exportLoading" @click="startExport">
+        {% raw %}{{ exportLoading ? 'Exporting applications...' : 'Export My Applications CSV' }}{% endraw %}
+      </button>
+
+      <div v-if="exportMessage" class="alert alert-info" role="alert">
+        {% raw %}{{ exportMessage }}{% endraw %}
+      </div>
+      <div v-if="exportError" class="alert alert-danger" role="alert">
+        {% raw %}{{ exportError }}{% endraw %}
+      </div>
+      <a v-if="exportDownloadUrl" :href="exportDownloadUrl" class="btn btn-success w-100" download>
+        Download CSV
+      </a>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  const { createApp } = Vue;
+  createApp({
+    data() {
+      return {
+        form: {
+          branch: {{ student.branch|tojson }},
+          cgpa: {{ student.cgpa|tojson }},
+          password: '',
+          notification_email: {{ (student.notification_email or student.user.email)|tojson }},
+          receive_notifications: {{ student.receive_notifications|tojson }}
+        },
+        currentPhoto: {{ (url_for('static', filename='uploads/' + student.profile_photo) if student.profile_photo else '')|tojson }},
+        previewUrl: '',
+        photoFile: null,
+        resumeFile: null,
+        loading: false,
+        message: '',
+        messageType: 'success',
+        exportLoading: false,
+        exportJobId: null,
+        exportStatus: '',
+        exportMessage: '',
+        exportError: '',
+        exportDownloadUrl: ''
+      };
+    },
+    methods: {
+      previewImage(event) {
+        const file = event.target.files[0];
+        if (file) {
+          this.photoFile = file;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.previewUrl = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      },
+      selectResume(event) {
+        this.resumeFile = event.target.files[0] || null;
+      },
+      async submitProfile() {
+        this.loading = true;
+        this.message = '';
+
+        try {
+          const formData = new FormData();
+          formData.append('branch', this.form.branch || '');
+          formData.append('cgpa', this.form.cgpa || '');
+          formData.append('password', this.form.password || '');
+          formData.append('notification_email', this.form.notification_email || '');
+          if (this.form.receive_notifications) {
+            formData.append('receive_notifications', 'on');
+          }
+          if (this.photoFile) {
+            formData.append('photo', this.photoFile);
+          }
+          if (this.resumeFile) {
+            formData.append('resume', this.resumeFile);
+          }
+
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            this.message = 'Profile updated successfully! Redirecting...';
+            this.messageType = 'success';
+            setTimeout(() => {
+              window.location.href = data.redirect;
+            }, 1200);
+          } else {
+            this.message = data.message || 'Failed to update profile';
+            this.messageType = 'error';
+          }
+        } catch (error) {
+          this.message = 'Error updating profile: ' + error.message;
+          this.messageType = 'error';
+          console.error(error);
+        } finally {
+          this.loading = false;
+        }
+      },
+      async startExport() {
+        this.exportLoading = true;
+        this.exportMessage = 'Starting CSV export...';
+        this.exportError = '';
+        this.exportDownloadUrl = '';
+
+        try {
+          const response = await fetch('/student/export-applications', {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          const data = await response.json();
+
+          if (response.ok && data.success) {
+            this.exportJobId = data.job_id;
+            this.exportStatus = 'PENDING';
+            this.exportMessage = 'Export job queued. Checking status...';
+            this.pollExportStatus();
+          } else {
+            this.exportError = data.message || 'Could not start export.';
+            this.exportMessage = '';
+          }
+        } catch (error) {
+          this.exportError = 'Unable to start export: ' + error.message;
+          console.error(error);
+        } finally {
+          this.exportLoading = false;
+        }
+      },
+      async pollExportStatus() {
+        if (!this.exportJobId) {
+          return;
+        }
+
+        try {
+          const response = await fetch(`/student/export-applications/status/${this.exportJobId}`);
+          const data = await response.json();
+
+          if (!data.success) {
+            this.exportError = data.message || 'Unable to fetch export status.';
+            return;
+          }
+
+          this.exportStatus = data.status;
+
+          if (data.status === 'COMPLETED') {
+            this.exportMessage = 'Your export is ready.';
+            this.exportDownloadUrl = `/student/export-applications/download/${this.exportJobId}`;
+          } else if (data.status === 'FAILED') {
+            this.exportError = data.error || 'Export failed.';
+            this.exportMessage = '';
+          } else {
+            this.exportMessage = `Export is ${data.status.toLowerCase()}. Retrying...`;
+            setTimeout(() => this.pollExportStatus(), 2000);
+          }
+        } catch (error) {
+          this.exportError = 'Unable to check export status: ' + error.message;
+          console.error(error);
+        }
+      }
+    }
+  }).mount('#student-profile-app');
+</script>
 {% endblock %}

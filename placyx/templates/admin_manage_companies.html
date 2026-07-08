@@ -15,7 +15,7 @@
 
 {% block content %}
 <h3 class="mb-4">Manage Companies</h3>
-<div class="container mt-5">
+<div class="container mt-5" id="admin-companies-app">
 
     <form method="GET" class="mb-4">
         <input
@@ -39,35 +39,28 @@
         </thead>
         <tbody>
             {% for company in companies %}
-            <tr>
+            <tr data-company-id="{{ company.id }}" data-initial-active="{{ company.user.is_active|tojson }}">
                 <td>{{ company.name }}</td>
                 <td>{{ company.hr_email }}</td>
                 <td>{{ company.website }}</td>
                 <td>{{ company.approval_status }}</td>
                 <td>
-                    {% if company.user.is_active %}
-                        <span class="badge bg-success">Active</span>
-                    {% else %}
-                        <span class="badge bg-danger">Blocked</span>
-                    {% endif %}
+                    <span v-if="isActive({{ company.id }})" class="badge bg-success">Active</span>
+                    <span v-else class="badge bg-danger">Blocked</span>
                 </td>
 
                 <td>
-                    {% if company.user.is_active %}
-                        <a
-                          href="{{ url_for('deactivate_company', company_id=company.id) }}"
-                          class="btn btn-danger btn-sm"
-                        >
-                          Deactivate
-                        </a>
-                    {% else %}
-                        <a
-                          href="{{ url_for('activate_company', company_id=company.id) }}"
-                          class="btn btn-success btn-sm"
-                        >
-                          Activate
-                        </a>
-                    {% endif %}
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      :class="isActive({{ company.id }}) ? 'btn-danger' : 'btn-success'"
+                      :disabled="loadingId === {{ company.id }}"
+                      @click="toggleCompany({{ company.id }})"
+                    >
+                      <span v-if="loadingId === {{ company.id }}">Working...</span>
+                      <span v-else-if="isActive({{ company.id }})">Deactivate</span>
+                      <span v-else>Activate</span>
+                    </button>
                 </td>
             </tr>
             {% endfor %}
@@ -75,4 +68,59 @@
     </table>
 
 </div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  const { createApp } = Vue;
+  
+  // Initialize state from server data BEFORE Vue mounts
+  const companyStateMap = {};
+  document.querySelectorAll('[data-company-id]').forEach((row) => {
+    const id = Number(row.dataset.companyId);
+    const isActive = row.dataset.initialActive === 'true';
+    companyStateMap[id] = isActive;
+  });
+  
+  createApp({
+    data() {
+      return {
+        activeMap: { ...companyStateMap },
+        loadingId: null
+      };
+    },
+    methods: {
+      isActive(companyId) {
+        return this.activeMap[companyId] ?? false;
+      },
+      async toggleCompany(companyId) {
+        const currentlyActive = this.isActive(companyId);
+        const endpoint = `/admin/company/${currentlyActive ? 'deactivate' : 'activate'}/${companyId}`;
+        this.loadingId = companyId;
+
+        try {
+          const response = await fetch(endpoint, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+
+          let data = null;
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            data = await response.json();
+          }
+
+          if (!response.ok || !data?.success) {
+            throw new Error(data?.message || 'Action failed');
+          }
+
+          // Only update state after successful API response
+          this.activeMap[companyId] = data.active;
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.loadingId = null;
+        }
+      }
+    }
+  }).mount('#admin-companies-app');
+</script>
 {% endblock %}

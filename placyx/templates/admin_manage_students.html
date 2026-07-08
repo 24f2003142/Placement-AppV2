@@ -15,7 +15,7 @@
 
 {% block content %}
 <h3 class="mb-4">Manage Students</h3>
-<div class="container mt-5">
+<div class="container mt-5" id="admin-students-app">
 
     <form method="GET" class="mb-4">
 
@@ -39,36 +39,29 @@
         </thead>
         <tbody>
             {% for student in students %}
-            <tr>
+            <tr data-student-id="{{ student.id }}" data-initial-active="{{ student.user.is_active|tojson }}">
                 <td>{{ student.name }}</td>
                 <td>{{ student.roll_no }}</td>
                 <td>{{ student.branch }}</td>
                 <td>{{ student.cgpa }}</td>
 
                 <td>
-                    {% if student.user.is_active %}
-                        <span class="badge bg-success">Active</span>
-                    {% else %}
-                        <span class="badge bg-danger">Blocked</span>
-                    {% endif %}
+                    <span v-if="isActive({{ student.id }})" class="badge bg-success">Active</span>
+                    <span v-else class="badge bg-danger">Blocked</span>
                 </td>
 
                 <td>
-                    {% if student.user.is_active %}
-                        <a
-                          href="{{ url_for('deactivate_student', student_id=student.id) }}"
-                          class="btn btn-danger btn-sm"
-                        >
-                          Deactivate
-                        </a>
-                    {% else %}
-                        <a
-                          href="{{ url_for('activate_student', student_id=student.id) }}"
-                          class="btn btn-success btn-sm"
-                        >
-                          Activate
-                        </a>
-                    {% endif %}
+                    <button
+                      type="button"
+                      class="btn btn-sm"
+                      :class="isActive({{ student.id }}) ? 'btn-danger' : 'btn-success'"
+                      :disabled="loadingId === {{ student.id }}"
+                      @click="toggleStudent({{ student.id }})"
+                    >
+                      <span v-if="loadingId === {{ student.id }}">Working...</span>
+                      <span v-else-if="isActive({{ student.id }})">Deactivate</span>
+                      <span v-else>Activate</span>
+                    </button>
                 </td>
             </tr>
             {% endfor %}
@@ -76,4 +69,59 @@
     </table>
 
 </div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  const { createApp } = Vue;
+  
+  // Initialize state from server data BEFORE Vue mounts
+  const studentStateMap = {};
+  document.querySelectorAll('[data-student-id]').forEach((row) => {
+    const id = Number(row.dataset.studentId);
+    const isActive = row.dataset.initialActive === 'true';
+    studentStateMap[id] = isActive;
+  });
+  
+  createApp({
+    data() {
+      return {
+        activeMap: { ...studentStateMap },
+        loadingId: null
+      };
+    },
+    methods: {
+      isActive(studentId) {
+        return this.activeMap[studentId] ?? false;
+      },
+      async toggleStudent(studentId) {
+        const currentlyActive = this.isActive(studentId);
+        const endpoint = `/admin/student/${currentlyActive ? 'deactivate' : 'activate'}/${studentId}`;
+        this.loadingId = studentId;
+
+        try {
+          const response = await fetch(endpoint, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+
+          let data = null;
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            data = await response.json();
+          }
+
+          if (!response.ok || !data?.success) {
+            throw new Error(data?.message || 'Action failed');
+          }
+
+          // Only update state after successful API response
+          this.activeMap[studentId] = data.active;
+        } catch (error) {
+          console.error(error);
+        } finally {
+          this.loadingId = null;
+        }
+      }
+    }
+  }).mount('#admin-students-app');
+</script>
 {% endblock %}

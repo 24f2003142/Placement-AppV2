@@ -17,9 +17,21 @@
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-5">
+  <div class="container mt-5" id="company-view-applicants-app">
 
-    <h3 class="mb-4 text-center">Applicants – {{ job.title }}</h3>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h3 class="mb-0">Applicants – {{ job.title }}</h3>
+      <div class="d-flex gap-2">
+        <input v-model="searchQuery" class="form-control" style="max-width: 240px;" placeholder="Search applicants">
+        <select v-model="statusFilter" class="form-select" style="max-width: 180px;">
+          <option value="">All statuses</option>
+          <option value="APPLIED">Applied</option>
+          <option value="SHORTLISTED">Shortlisted</option>
+          <option value="SELECTED">Selected</option>
+          <option value="REJECTED">Rejected</option>
+        </select>
+      </div>
+    </div>
 
     <table class="table table-bordered bg-white">
       <thead class="table-dark">
@@ -32,68 +44,122 @@
         </tr>
       </thead>
       <tbody>
-        {% for app in applications %}
-        <tr>
-          <td>{{ app.student.name }}</td>
-          <td>{{ app.student.branch }}</td>
-          <td>{{ app.student.cgpa }}</td>
+        <tr v-for="app in filteredApplications" :key="app.id">
+          <td v-text="app.student_name"></td>
+          <td v-text="app.branch"></td>
+          <td v-text="app.cgpa"></td>
           <td>
-            {% if app.status == "SELECTED" %}
-              <span class="badge bg-success">Selected</span>
-            {% elif app.status == "SHORTLISTED" %}
-              <span class="badge bg-info">Shortlisted</span>
-            {% elif app.status == "REJECTED" %}
-              <span class="badge bg-danger">Rejected</span>
-            {% else %}
-              <span class="badge bg-secondary">Applied</span>
-            {% endif %}
+            <span v-if="app.status === 'SELECTED'" class="badge bg-success">Selected</span>
+            <span v-else-if="app.status === 'SHORTLISTED'" class="badge bg-info">Shortlisted</span>
+            <span v-else-if="app.status === 'REJECTED'" class="badge bg-danger">Rejected</span>
+            <span v-else class="badge bg-secondary">Applied</span>
           </td>
           <td>
-          {% if job.status == "CLOSED" %}
+            <template v-if="jobClosed">
               <span class="badge bg-secondary">Drive Closed</span>
-          {% else %}
-            {% if app.status == "APPLIED" %}
-              <a href="{{ url_for('shortlist_application', app_id=app.id) }}"
-                class="btn btn-warning btn-sm">
-                Shortlist
-              </a>
-
-              <a href="{{ url_for('reject_application', app_id=app.id) }}"
-                class="btn btn-danger btn-sm">
-                Reject
-              </a>
-
-              <a href="{{ url_for('select_student', app_id=app.id) }}"
-                class="btn btn-success btn-sm">
-                Select
-              </a>
-            {% elif app.status == "SHORTLISTED" %}
-              <a href="{{ url_for('reject_application', app_id=app.id) }}"
-                class="btn btn-danger btn-sm">
-                Reject
-              </a>
-
-              <a href="{{ url_for('select_student', app_id=app.id) }}"
-                class="btn btn-success btn-sm">
-                Select
-              </a>
-              <button class="btn btn-warning btn-sm" disabled>Shortlisted</button>
-            {% elif app.status == "REJECTED" %}
-              <button class="btn btn-danger btn-sm" disabled>Rejected</button>
-            {% elif app.status == "SELECTED" %}
-              <button class="btn btn-success btn-sm" disabled>Selected</button>
-            {% endif %}
-            
-            <a href="{{ url_for('company_view_candidate', app_id=app.id) }}"
-              class="btn btn-outline-primary btn-sm">
-              View Details
-            </a>
-          {% endif %}
-        </td>
+            </template>
+            <template v-else>
+              <template v-if="app.status === 'APPLIED'">
+                <button @click="updateStatus(app.id, 'SHORTLISTED')" :disabled="app.loading" class="btn btn-warning btn-sm">
+                  <span v-text="app.loading && app.action === 'SHORTLISTED' ? '...' : 'Shortlist'"></span>
+                </button>
+                <button @click="updateStatus(app.id, 'REJECTED')" :disabled="app.loading" class="btn btn-danger btn-sm">
+                  <span v-text="app.loading && app.action === 'REJECTED' ? '...' : 'Reject'"></span>
+                </button>
+                <button @click="updateStatus(app.id, 'SELECTED')" :disabled="app.loading" class="btn btn-success btn-sm">
+                  <span v-text="app.loading && app.action === 'SELECTED' ? '...' : 'Select'"></span>
+                </button>
+              </template>
+              <template v-else-if="app.status === 'SHORTLISTED'">
+                <button @click="updateStatus(app.id, 'REJECTED')" :disabled="app.loading" class="btn btn-danger btn-sm">
+                  <span v-text="app.loading && app.action === 'REJECTED' ? '...' : 'Reject'"></span>
+                </button>
+                <button @click="updateStatus(app.id, 'SELECTED')" :disabled="app.loading" class="btn btn-success btn-sm">
+                  <span v-text="app.loading && app.action === 'SELECTED' ? '...' : 'Select'"></span>
+                </button>
+                <button class="btn btn-warning btn-sm" disabled>Shortlisted</button>
+              </template>
+              <template v-else-if="app.status === 'REJECTED'">
+                <button class="btn btn-danger btn-sm" disabled>Rejected</button>
+              </template>
+              <template v-else-if="app.status === 'SELECTED'">
+                <button class="btn btn-success btn-sm" disabled>Selected</button>
+              </template>
+              <a :href="app.details_url" class="btn btn-outline-primary btn-sm ms-1">View Details</a>
+            </template>
+          </td>
         </tr>
-        {% endfor %}
       </tbody>
     </table>
 
   </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script>
+    const { createApp } = Vue;
+    createApp({
+      data() {
+        return {
+          searchQuery: '',
+          statusFilter: '',
+          jobClosed: {{ 'true' if job.status == 'CLOSED' else 'false' }},
+          applications: [
+            {% for app in applications %}
+            {
+              id: {{ app.id }},
+              student_name: {{ app.student.name|tojson }},
+              branch: {{ app.student.branch|tojson }},
+              cgpa: {{ app.student.cgpa|tojson }},
+              status: {{ app.status|tojson }},
+              details_url: {{ url_for('company_view_candidate', app_id=app.id)|tojson }},
+              loading: false,
+              action: null
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+          ]
+        };
+      },
+      computed: {
+        filteredApplications() {
+          const query = this.searchQuery.trim().toLowerCase();
+          return this.applications.filter(app => {
+            const statusMatch = !this.statusFilter || app.status === this.statusFilter;
+            if (!query) return statusMatch;
+            const haystack = `${app.student_name} ${app.branch} ${app.cgpa} ${app.status}`.toLowerCase();
+            return statusMatch && haystack.includes(query);
+          });
+        }
+      },
+      methods: {
+        async updateStatus(appId, status) {
+          const app = this.applications.find(item => item.id === appId);
+          if (!app) return;
+
+          app.loading = true;
+          app.action = status;
+
+          try {
+            const response = await fetch(`/company/application/${appId}/${status.toLowerCase()}`, {
+              method: 'GET',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            const data = await response.json();
+            if (response.ok && data.success) {
+              app.status = data.status;
+              if (data.job_closed) {
+                this.jobClosed = true;
+              }
+            } else {
+              alert(data.message || 'Failed to update status');
+            }
+          } catch (error) {
+            alert('Unable to update status');
+          } finally {
+            app.loading = false;
+            app.action = null;
+          }
+        }
+      }
+    }).mount('#company-view-applicants-app');
+  </script>
 {% endblock %}

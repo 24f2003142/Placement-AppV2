@@ -17,19 +17,107 @@
 {% endblock %}
 
 {% block content %}
-  <div class="container mt-5">
+  <div class="container mt-5" id="job-form-app">
       <div class="card p-4 mx-auto" style="max-width: 600px;">
         <h3 class="mb-3 text-center">Create Job Post</h3>
 
-        <form method="POST">
-          <input class="form-control mb-2" name="title" placeholder="Job Title" required>
-          <textarea class="form-control mb-2" name="description" placeholder="Job Description"></textarea>
-          <textarea class="form-control mb-2" name="eligibility" placeholder="Eligibility Criteria"></textarea>
-          <label for="applicationEndDate">Application End Date</label>
-          <input class="form-control mb-3" type="date" name="deadline" required>
+        <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-danger']" role="alert">
+          {% raw %}{{ message }}{% endraw %}
+        </div>
 
-          <button class="btn btn-primary w-100">Submit for Approval</button>
+        <form @submit.prevent="submitJob">
+          <input 
+            v-model="form.title" 
+            class="form-control mb-2" 
+            placeholder="Job Title" 
+            required>
+          <textarea 
+            v-model="form.description" 
+            class="form-control mb-2" 
+            placeholder="Job Description"></textarea>
+          <textarea 
+            v-model="form.eligibility" 
+            class="form-control mb-2" 
+            placeholder="Eligibility Criteria"></textarea>
+          <label for="applicationEndDate">Application End Date</label>
+          <input 
+            v-model="form.deadline" 
+            class="form-control mb-3" 
+            type="date" 
+            required>
+
+          <button 
+            type="submit" 
+            class="btn btn-primary w-100" 
+            :disabled="loading">
+            {% raw %}{{ loading ? 'Submitting...' : 'Submit for Approval' }}{% endraw %}
+          </button>
         </form>
       </div>
   </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script>
+    const { createApp } = Vue;
+    createApp({
+      data() {
+        return {
+          form: {
+            title: '',
+            description: '',
+            eligibility: '',
+            deadline: ''
+          },
+          loading: false,
+          message: '',
+          messageType: 'success'
+        };
+      },
+      methods: {
+        async submitJob() {
+          if (!this.form.title || !this.form.deadline) {
+            this.message = 'Job Title and Deadline are required';
+            this.messageType = 'error';
+            return;
+          }
+
+          this.loading = true;
+          this.message = '';
+
+          try {
+            const formData = new FormData();
+            formData.append('title', this.form.title);
+            formData.append('description', this.form.description);
+            formData.append('eligibility', this.form.eligibility);
+            formData.append('deadline', this.form.deadline);
+
+            const response = await fetch(window.location.href, {
+              method: 'POST',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' },
+              body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+              this.message = 'Job posted successfully! Redirecting...';
+              this.messageType = 'success';
+              setTimeout(() => {
+                window.location.href = data.redirect;
+              }, 1500);
+            } else {
+              this.message = data.message || 'Failed to create job';
+              this.messageType = 'error';
+            }
+          } catch (error) {
+            this.message = 'Error submitting job: ' + error.message;
+            this.messageType = 'error';
+            console.error(error);
+          } finally {
+            this.loading = false;
+          }
+        }
+      }
+    }).mount('#job-form-app');
+  </script>
 {% endblock %}

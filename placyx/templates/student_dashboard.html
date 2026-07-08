@@ -23,47 +23,96 @@
         {% endblock %}
 
     {% block content %}
-    <h2 class="mb-4">Student Dashboard</h2>
+    <div id="student-dashboard-app">
+        <h2 class="mb-4">Student Dashboard</h2>
 
-    <div class="container mt-5">
-    {% if current_user.student.is_placed %}
-    <div class="alert alert-success text-center">
-        🎉 Congratulations! You have been placed.
-    </div>
-    {% endif %}
+        <div class="container mt-5">
+        {% if current_user.student.is_placed %}
+        <div class="alert alert-success text-center">
+            🎉 Congratulations! You have been placed.
+        </div>
+        {% endif %}
 
-    <h2 class="mb-4 text-center">Available Placement Drives</h2>
+        <h2 class="mb-4 text-center">Available Placement Drives</h2>
 
-    {% if jobs %}
-        <div class="row g-4">
+        {% if jobs %}
+            <div class="row g-4">
 
-            {% for job in jobs %}
-            <div class="col-md-6">
-                <div class="card job-card p-4">
-                    <h5>{{ job.title }}</h5>
-                    <p class="mb-1"><strong>Company:</strong> {{ job.company.name }}</p>
-                    <p class="mb-1"><strong>Eligibility:</strong> {{ job.eligibility }}</p>
-                    <p class="mb-2"><strong>Deadline:</strong> {{ job.application_deadline }}</p>
-                    <a href="/student/job/{{ job.id }}"
-                    class="btn btn-outline-primary btn-sm">
-                    View Details
-                    </a>
+                {% for job in jobs %}
+                <div class="col-md-6">
+                    <div class="card job-card p-4">
+                        <h5>{{ job.title }}</h5>
+                        <p class="mb-1"><strong>Company:</strong> {{ job.company.name }}</p>
+                        <p class="mb-1"><strong>Eligibility:</strong> {{ job.eligibility }}</p>
+                        <p class="mb-2"><strong>Deadline:</strong> {{ job.application_deadline }}</p>
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="/student/job/{{ job.id }}"
+                            class="btn btn-outline-primary btn-sm">
+                            View Details
+                            </a>
 
-                    {% if not current_user.student.is_placed %}
-                        <a href="/student/job/apply/{{ job.id }}"
-                        class="btn btn-primary btn-sm">
-                            Apply
-                        </a>
-                    {% else %}
-                        <span class="badge bg-success">Placed</span>
-                    {% endif %}
+                            {% if not current_user.student.is_placed %}
+                                <button v-if="!appliedJobIds.includes({{ job.id }})"
+                                    type="button"
+                                    class="btn btn-primary btn-sm"
+                                    @click="applyJob({{ job.id }})"
+                                    :disabled="loadingJobId === {{ job.id }}">
+                                    <span v-if="loadingJobId === {{ job.id }}">Applying…</span>
+                                    <span v-else>Apply</span>
+                                </button>
+                                <span v-else class="badge bg-success align-self-center">Applied</span>
+                            {% else %}
+                                <span class="badge bg-success align-self-center">Placed</span>
+                            {% endif %}
+                        </div>
+                        <div v-if="messageMap[{{ job.id }}]" class="alert alert-success small mt-3 mb-0" role="alert">
+                            {% raw %}{{ messageMap[job.id] }}{% endraw %}
+                        </div>
+                    </div>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
+        {% else %}
+            <div class="alert alert-info text-center">
+                No active placement drives available.
+            </div>
+        {% endif %}
         </div>
-    {% else %}
-        <div class="alert alert-info text-center">
-            No active placement drives available.
-        </div>
-    {% endif %}
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    appliedJobIds: {{ applied_job_ids|tojson }},
+                    loadingJobId: null,
+                    messageMap: {}
+                };
+            },
+            methods: {
+                async applyJob(jobId) {
+                    this.loadingJobId = jobId;
+                    try {
+                        const response = await fetch(`/student/job/apply/${jobId}`, {
+                            method: 'POST',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const data = await response.json();
+                        if (response.ok && data.success) {
+                            this.appliedJobIds.push(jobId);
+                            this.messageMap[jobId] = data.message || 'You have applied successfully for this job.';
+                        } else {
+                            this.messageMap[jobId] = data.message || 'Unable to apply right now.';
+                        }
+                    } catch (error) {
+                        this.messageMap[jobId] = 'Unable to apply right now.';
+                    } finally {
+                        this.loadingJobId = null;
+                    }
+                }
+            }
+        }).mount('#student-dashboard-app');
+    </script>
 {% endblock %}

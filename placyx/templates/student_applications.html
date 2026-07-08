@@ -23,40 +23,81 @@
         {% endblock %}
         
     {% block content %}
-    <h3 class="mb-4 text-center">My Job Applications</h3>
+    <div id="student-applications-app">
+        <h3 class="mb-4 text-center">My Job Applications</h3>
 
-        {% if applications %}
-        <table class="table table-bordered bg-white">
-            <thead class="table-dark">
-                <tr>
-                    <th>Job Title</th>
-                    <th>Company</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for app in applications %}
-                <tr>
-                    <td>{{ app.job_post.title }}</td>
-                    <td>{{ app.job_post.company.name }}</td>
-                    <td>
-                        {% if app.status == "APPLIED" %}
-                            <span class="badge bg-secondary">Applied</span>
-                        {% elif app.status == "SHORTLISTED" %}
-                            <span class="badge bg-warning">Shortlisted</span>
-                        {% elif app.status == "SELECTED" %}
-                            <span class="badge bg-success">Selected</span>
-                        {% else %}
-                            <span class="badge bg-danger">Rejected</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% else %}
-            <div class="alert alert-info text-center">
-                You have not applied to any jobs yet.
-            </div>
-        {% endif %}
+        <div class="d-flex justify-content-end mb-3 gap-2">
+            <input v-model="searchQuery" class="form-control" style="max-width: 240px;" placeholder="Search applications">
+            <select v-model="statusFilter" class="form-select" style="max-width: 180px;">
+                <option value="">All statuses</option>
+                <option value="APPLIED">Applied</option>
+                <option value="SHORTLISTED">Shortlisted</option>
+                <option value="SELECTED">Selected</option>
+                <option value="REJECTED">Rejected</option>
+            </select>
+        </div>
+
+        <div v-if="filteredApplications.length">
+            <table class="table table-bordered bg-white">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Job Title</th>
+                        <th>Company</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr v-for="app in filteredApplications" :key="app.id">
+                        <td v-text="app.title"></td>
+                        <td v-text="app.company"></td>
+                        <td>
+                            <span v-if="app.status === 'APPLIED'" class="badge bg-secondary">Applied</span>
+                            <span v-else-if="app.status === 'SHORTLISTED'" class="badge bg-warning">Shortlisted</span>
+                            <span v-else-if="app.status === 'SELECTED'" class="badge bg-success">Selected</span>
+                            <span v-else class="badge bg-danger">Rejected</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div v-else class="alert alert-info text-center">
+            You have not applied to any jobs yet.
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    searchQuery: '',
+                    statusFilter: '',
+                    applications: [
+                        {% for app in applications %}
+                        {
+                            id: {{ app.id }},
+                            title: {{ app.job_post.title|tojson }},
+                            company: {{ app.job_post.company.name|tojson }},
+                            status: {{ app.status|tojson }}
+                        }{% if not loop.last %},{% endif %}
+                        {% endfor %}
+                    ]
+                };
+            },
+            computed: {
+                filteredApplications() {
+                    const query = this.searchQuery.trim().toLowerCase();
+                    return this.applications.filter(app => {
+                        const statusMatch = !this.statusFilter || app.status === this.statusFilter;
+                        if (!query) {
+                            return statusMatch;
+                        }
+                        const haystack = `${app.title} ${app.company} ${app.status}`.toLowerCase();
+                        return statusMatch && haystack.includes(query);
+                    });
+                }
+            }
+        }).mount('#student-applications-app');
+    </script>
 {% endblock %}

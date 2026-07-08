@@ -1,8 +1,9 @@
 import os
 from flask import Flask
 from config import Config
-from models import db, User, College, Admin, Company, Student, JobPost, Blog, Application
-from flask import request, render_template, redirect, url_for, flash
+from models import db, User, College, Admin, Company, Student, JobPost, Blog, Application, ExportJob
+from tasks import generate_student_csv_export
+from flask import request, render_template, redirect, url_for, flash, jsonify, send_file
 from flask_login import login_user, login_required, current_user, logout_user, LoginManager
 from werkzeug.security import check_password_hash,generate_password_hash
 from datetime import datetime
@@ -22,7 +23,10 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
 
-    
+    def get_current_student():
+        if current_user.is_authenticated and current_user.role == "STUDENT":
+            return Student.query.filter_by(user_id=current_user.id).first()
+        return None
 
     with app.app_context():
         # Create instance folder if missing
@@ -55,7 +59,7 @@ def create_app():
             db.session.add(admin_user)
             db.session.commit()
 
-            admin = Admin(user_id=admin_user.id, college_id=1)
+            admin = Admin(user_id=admin_user.id, college_id=1, notification_email=admin_user.email)
             db.session.add(admin)
             db.session.commit()
 
@@ -68,44 +72,111 @@ def create_app():
         return User.query.get(int(user_id))
     
     @app.route("/login", methods=["GET", "POST"])
-    @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "POST":
             email = request.form.get("email")
             password = request.form.get("password")
+            is_ajax = request.headers.get("X-Requested-With") == "XMLHttpRequest"
 
             user = User.query.filter_by(email=email).first()
 
             if not user:
-                flash("Invalid credentials")
+                message = "Invalid credentials"
+                if is_ajax:
+                    return jsonify({"success": False, "message": message}), 401
+                flash(message)
                 return redirect(url_for("login"))
 
             if not user.is_active:
-                flash("Account deactivated")
+                message = "Account deactivated"
+                if is_ajax:
+                    return jsonify({"success": False, "message": message}), 403
+                flash(message)
                 return redirect(url_for("login"))
 
             if not check_password_hash(user.password_hash, password):
-                flash("Invalid credentials")
+                message = "Invalid credentials"
+                if is_ajax:
+                    return jsonify({"success": False, "message": message}), 401
+                flash(message)
                 return redirect(url_for("login"))
 
-            # Company approval gate
             if user.role == "COMPANY":
-                if user.company.approval_status != "APPROVED":
-                    flash("Company not approved yet")
+                company = user.company
+                if company is None:
+                    message = "Company account is not available"
+                    if is_ajax:
+                        return jsonify({"success": False, "message": message}), 403
+                    flash(message)
+                    return redirect(url_for("login"))
+                if company.is_blacklisted:
+                    message = "Company account is blacklisted"
+                    if is_ajax:
+                        return jsonify({"success": False, "message": message}), 403
+                    flash(message)
+                    return redirect(url_for("login"))
+                if company.approval_status != "APPROVED":
+                    message = "Company account is not approved yet"
+                    if is_ajax:
+                        return jsonify({"success": False, "message": message}), 403
+                    flash(message)
+                    return redirect(url_for("login"))
+            elif user.role == "STUDENT":
+                student = user.student
+                if student is not None and getattr(student, "is_blacklisted", False):
+                    message = "Student account is blacklisted"
+                    if is_ajax:
+                        return jsonify({"success": False, "message": message}), 403
+                    flash(message)
                     return redirect(url_for("login"))
 
             login_user(user)
 
-            # Role-based redirect
             if user.role == "ADMIN":
-                return redirect(url_for("admin_dashboard"))
+                redirect_url = url_for("admin_dashboard")
             elif user.role == "COMPANY":
-                return redirect(url_for("company_dashboard"))
+                redirect_url = url_for("company_dashboard")
             else:
-                return redirect(url_for("student_dashboard"))
+                redirect_url = url_for("student_dashboard")
+
+            if is_ajax:
+                return jsonify({"success": True, "redirect": redirect_url})
+            return redirect(redirect_url)
 
         return render_template("login.html")
         
+    @app.route("/admin/profile", methods=["GET", "POST"])
+    @login_required
+    def admin_profile():
+        if current_user.role != "ADMIN":
+            return "Unauthorized", 403
+
+        admin = current_user.admin
+        if not admin:
+            return "Admin profile missing", 404
+
+        if request.method == "POST":
+            try:
+                notification_email = request.form.get("notification_email", "").strip()
+                receive_notifications = request.form.get("receive_notifications") == "on"
+                new_password = request.form.get("password", "").strip()
+
+                admin.notification_email = notification_email
+                admin.receive_notifications = receive_notifications
+                if new_password:
+                    current_user.password_hash = generate_password_hash(new_password)
+
+                db.session.commit()
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": True, "message": "Profile updated successfully", "redirect": url_for("admin_dashboard")})
+                return redirect(url_for("admin_dashboard"))
+            except Exception as e:
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": False, "message": str(e)}), 400
+                flash("Error updating profile", "error")
+
+        return render_template("admin_profile.html", admin=admin)
+
     @app.route("/admin/dashboard")
     @login_required
     def admin_dashboard():
@@ -251,6 +322,8 @@ def create_app():
         company.approval_status = "APPROVED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Company approved"})
         return redirect(url_for("admin_company_approval"))
 
     @app.route("/admin/company/reject/<int:company_id>")
@@ -263,6 +336,8 @@ def create_app():
         company.approval_status = "REJECTED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Company rejected"})
         return redirect(url_for("admin_company_approval"))
     
     @app.route("/admin/students")
@@ -293,6 +368,8 @@ def create_app():
         student.user.is_active = False
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Student deactivated", "active": False})
         return redirect(url_for("admin_manage_students"))
     
     @app.route("/admin/student/activate/<int:student_id>")
@@ -305,6 +382,8 @@ def create_app():
         student.user.is_active = True
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Student activated", "active": True})
         return redirect(url_for("admin_manage_students"))
 
     @app.route("/admin/manage-companies")
@@ -336,6 +415,8 @@ def create_app():
         company.user.is_active = False
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Company deactivated", "active": False})
         return redirect(url_for("admin_manage_companies"))
 
     @app.route("/admin/company/activate/<int:company_id>")
@@ -349,6 +430,8 @@ def create_app():
         company.approval_status = "APPROVED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Company activated", "active": True})
         return redirect(url_for("admin_manage_companies"))
 
     @app.route("/admin/job-posts")
@@ -373,6 +456,8 @@ def create_app():
         job.status = "APPROVED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Job approved successfully"})
         return redirect(url_for("admin_job_approvals"))
     
 
@@ -386,6 +471,8 @@ def create_app():
         job.status = "REJECTED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Job rejected successfully"})
         return redirect(url_for("admin_job_approvals"))
     
     @app.route("/admin/jobs")
@@ -486,19 +573,26 @@ def create_app():
             return "Unauthorized", 403
 
         if request.method == "POST":
-            job = JobPost(
-                company_id=current_user.company.id,
-                college_id=current_user.company.college_id,
-                title=request.form["title"],
-                description=request.form["description"],
-                eligibility=request.form["eligibility"],
-                application_deadline = datetime.strptime(request.form["deadline"], "%Y-%m-%d").date(),
-                status="PENDING"
-            )
-            db.session.add(job)
-            db.session.commit()
+            try:
+                job = JobPost(
+                    company_id=current_user.company.id,
+                    college_id=current_user.company.college_id,
+                    title=request.form["title"],
+                    description=request.form["description"],
+                    eligibility=request.form["eligibility"],
+                    application_deadline = datetime.strptime(request.form["deadline"], "%Y-%m-%d").date(),
+                    status="PENDING"
+                )
+                db.session.add(job)
+                db.session.commit()
 
-            return redirect(url_for("company_dashboard"))
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": True, "message": "Job posted successfully", "redirect": url_for("company_dashboard")})
+                return redirect(url_for("company_dashboard"))
+            except Exception as e:
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": False, "message": str(e)}), 400
+                flash("Error creating job post", "error")
 
         return render_template("company_create_job.html")
 
@@ -550,6 +644,14 @@ def create_app():
 
             db.session.commit()
 
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({
+                    "success": True,
+                    "message": f"Application {status.lower()} successfully",
+                    "status": status,
+                    "job_closed": status == "SELECTED"
+                })
+
         return redirect(
             url_for("view_applicants", job_id=application.job_post_id)
         )
@@ -567,6 +669,9 @@ def create_app():
 
         application.status = "SHORTLISTED"
         db.session.commit()
+
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Application shortlisted", "status": "SHORTLISTED"})
 
         return redirect(
             url_for("view_applicants", job_id=application.job_post_id)
@@ -586,6 +691,9 @@ def create_app():
         application.status = "REJECTED"
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Application rejected", "status": "REJECTED"})
+
         return redirect(
             url_for("view_applicants", job_id=application.job_post_id)
         )
@@ -598,23 +706,35 @@ def create_app():
         company = current_user.company
 
         if request.method == "POST":
+            try:
+                # Only update fields that changed
+                website = request.form.get("website", "").strip()
+                hr_email = request.form.get("hr_email", "").strip()
+                new_password = request.form.get("password", "").strip()
+                
+                if website and website != company.website:
+                    company.website = website
+                if hr_email and hr_email != company.hr_email:
+                    company.hr_email = hr_email
+                if new_password:
+                    current_user.password_hash = generate_password_hash(new_password)
 
-            company.website = request.form.get("website")
-            company.hr_email = request.form.get("hr_email")
+                file = request.files.get("logo")
+                if file and allowed_file(file.filename):
+                    filename = str(company.name) + "_" + secure_filename(file.filename)
+                    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    file.save(file_path)
+                    company.logo = filename
 
-            new_password = request.form.get("password")
-            if new_password:
-                current_user.password_hash = generate_password_hash(new_password)
-
-            file = request.files.get("logo")
-            if file and allowed_file(file.filename):
-                filename = str(company.name) + "_" + secure_filename(file.filename)
-                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file.save(file_path)
-                company.logo = filename
-
-            db.session.commit()
-            return redirect(url_for("company_dashboard"))
+                db.session.commit()
+                
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": True, "message": "Profile updated successfully", "redirect": url_for("company_dashboard")})
+                return redirect(url_for("company_dashboard"))
+            except Exception as e:
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": False, "message": str(e)}), 400
+                flash("Error updating profile", "error")
 
         return render_template("company_profile.html", company=company)
 
@@ -626,79 +746,164 @@ def create_app():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
+        student = get_current_student()
+        if not student:
+            return "Student profile not found", 404
+
         jobs = JobPost.query.filter_by(
             status="APPROVED",
-            college_id=current_user.student.college_id
+            college_id=student.college_id
         ).all()
+
+        applied_job_ids = [
+            application.job_post_id
+            for application in Application.query.filter_by(student_id=student.id).all()
+        ]
 
         return render_template(
             "student_dashboard.html",
-            jobs=jobs
+            jobs=jobs,
+            applied_job_ids=applied_job_ids
         )
+
     @app.route("/student/profile", methods=["GET", "POST"])
     @login_required
     def student_profile():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
-        student = current_user.student
+        student = get_current_student()
+        if not student:
+            return "Student profile not found", 404
 
         if request.method == "POST":
+            try:
+                student.branch = request.form.get("branch", "")
+                student.cgpa = request.form.get("cgpa", "")
+                student.notification_email = request.form.get("notification_email", "")
+                student.receive_notifications = request.form.get("receive_notifications") == "on"
 
-            # Update branch and CGPA
-            student.branch = request.form.get("branch")
-            student.cgpa = request.form.get("cgpa")
+                new_password = request.form.get("password", "")
+                if new_password:
+                    current_user.password_hash = generate_password_hash(new_password)
 
-            # Password change
-            new_password = request.form.get("password")
-            if new_password:
-                current_user.password_hash = generate_password_hash(new_password)
+                file = request.files.get("photo")
+                if file and file.filename and allowed_file(file.filename):
+                    filename = student.name + student.roll_no + secure_filename(file.filename)
+                    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    file.save(file_path)
+                    student.profile_photo = filename
 
-            # Photo upload
-            file = request.files.get("photo")
-            if file and allowed_file(file.filename):
-                filename = student.name+student.roll_no+secure_filename(file.filename)
-                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file.save(file_path)
-                student.profile_photo = filename
+                file2 = request.files.get("resume")
+                if file2 and file2.filename:
+                    filename = student.name + student.roll_no + secure_filename(file2.filename)
+                    file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                    file2.save(file_path)
+                    student.resume_path = filename
 
-            file2 = request.files.get("resume")
-            if file2:
-                filename = student.name+student.roll_no+secure_filename(file2.filename)
-                file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-                file2.save(file_path)
-                student.resume_path = filename
+                db.session.commit()
 
-            db.session.commit()
-            return redirect(url_for("student_dashboard"))
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": True, "message": "Profile updated successfully", "redirect": url_for("student_dashboard")})
+                return redirect(url_for("student_dashboard"))
+            except Exception as e:
+                if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return jsonify({"success": False, "message": str(e)}), 400
+                flash("Error updating profile", "error")
 
         return render_template("student_profile.html", student=student)
 
-    @app.route("/student/job/apply/<int:job_id>")
+    @app.route("/student/export-applications", methods=["POST"])
+    @login_required
+    def student_export_applications():
+        if current_user.role != "STUDENT":
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+        student = get_current_student()
+        if not student:
+            return jsonify({"success": False, "message": "Student profile not found"}), 404
+
+        export_job = ExportJob(
+            student_id=student.id,
+            task_id="",
+            job_type="APPLICATION_CSV",
+            status="PENDING"
+        )
+        db.session.add(export_job)
+        db.session.commit()
+
+        celery_task = generate_student_csv_export.delay(student.id, export_job.id)
+        export_job.task_id = celery_task.id
+        db.session.commit()
+
+        return jsonify({"success": True, "job_id": export_job.id, "task_id": celery_task.id})
+
+    @app.route("/student/export-applications/status/<int:job_id>")
+    @login_required
+    def student_export_status(job_id):
+        if current_user.role != "STUDENT":
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+        export_job = ExportJob.query.get_or_404(job_id)
+        if export_job.student_id != get_current_student().id:
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
+
+        return jsonify({
+            "success": True,
+            "status": export_job.status,
+            "file_path": export_job.file_path,
+            "error": export_job.error_message
+        })
+
+    @app.route("/student/export-applications/download/<int:job_id>")
+    @login_required
+    def student_export_download(job_id):
+        if current_user.role != "STUDENT":
+            return "Unauthorized", 403
+
+        export_job = ExportJob.query.get_or_404(job_id)
+        if export_job.student_id != get_current_student().id:
+            return "Unauthorized", 403
+
+        if export_job.status != "COMPLETED" or not export_job.file_path:
+            return "File not available yet", 404
+
+        return send_file(export_job.file_path, as_attachment=True)
+
+    @app.route("/student/job/apply/<int:job_id>", methods=["GET", "POST"])
     @login_required
     def apply_job(job_id):
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
+        student = get_current_student()
+        if not student:
+            return "Student profile not found", 404
+
         job = JobPost.query.get_or_404(job_id)
 
-        # 🚫 Prevent applying to closed jobs
         if job.status != "APPROVED":
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": "This drive is no longer open."}), 400
             return redirect(url_for("student_dashboard"))
 
-        if current_user.student.is_placed:
+        if student.is_placed:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": "You are already placed."}), 400
             return redirect(url_for("student_dashboard"))
 
         existing = Application.query.filter_by(
-            student_id=current_user.student.id,
+            student_id=student.id,
             job_post_id=job_id
         ).first()
 
         if existing:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": True, "message": "You already applied for this job.", "applied": True})
             return redirect(url_for("student_applications"))
 
         application = Application(
-            student_id=current_user.student.id,
+            student_id=student.id,
             job_post_id=job_id,
             status="APPLIED"
         )
@@ -706,6 +911,8 @@ def create_app():
         db.session.add(application)
         db.session.commit()
 
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "You have applied successfully for this job.", "applied": True})
         return redirect(url_for("student_applications"))
     
     @app.route("/student/job/<int:job_id>")
@@ -714,16 +921,26 @@ def create_app():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
+        student = get_current_student()
+        if not student:
+            return "Student profile not found", 404
+
         job = JobPost.query.filter_by(
             id=job_id,
             status="APPROVED",
-            college_id=current_user.student.college_id
+            college_id=student.college_id
         ).first_or_404()
+
+        has_applied = Application.query.filter_by(
+            student_id=student.id,
+            job_post_id=job_id
+        ).first() is not None
 
         return render_template(
             "student_job_details.html",
             job=job,
-            back_url=url_for("student_dashboard")
+            back_url=url_for("student_dashboard"),
+            has_applied=has_applied
         )
 
     @app.route("/student/applications")
@@ -732,8 +949,12 @@ def create_app():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
 
+        student = get_current_student()
+        if not student:
+            return "Student profile not found", 404
+
         applications = Application.query.filter_by(
-            student_id=current_user.student.id
+            student_id=student.id
         ).all()
 
         return render_template(
@@ -769,6 +990,9 @@ def create_app():
         job.status = "CLOSED"
 
         db.session.commit()
+
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"success": True, "message": "Student selected and drive closed", "status": "SELECTED", "job_closed": True})
 
         return redirect(url_for("view_applicants", job_id=job.id))
     

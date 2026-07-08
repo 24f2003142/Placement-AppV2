@@ -62,6 +62,8 @@ class Admin(db.Model):
         db.ForeignKey("colleges.id", ondelete="CASCADE"),
         nullable=False
     )
+    notification_email = db.Column(db.String(120))
+    receive_notifications = db.Column(db.Boolean, default=True)
 
     blogs = db.relationship("Blog", backref="admin", lazy=True)
 
@@ -91,6 +93,8 @@ class Student(db.Model):
     cgpa = db.Column(db.Float)
     resume_path = db.Column(db.String(200))
     is_placed = db.Column(db.Boolean, default=False)
+    notification_email = db.Column(db.String(120))
+    receive_notifications = db.Column(db.Boolean, default=True)
 
     applications = db.relationship("Application", backref="student", lazy=True)
     profile_photo = db.Column(db.String(200))
@@ -199,6 +203,26 @@ class Application(db.Model):
 # --------------------------------------------------
 # BLOGS / ANNOUNCEMENTS (ADMIN CONTROLLED)
 # --------------------------------------------------
+class ExportJob(db.Model):
+    __tablename__ = "export_jobs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(
+        db.Integer,
+        db.ForeignKey("students.id", ondelete="CASCADE"),
+        nullable=False
+    )
+    task_id = db.Column(db.String(100), nullable=False)
+    job_type = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(30), nullable=False, default="PENDING")
+    file_path = db.Column(db.String(300))
+    error_message = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    completed_at = db.Column(db.DateTime)
+
+    student = db.relationship("Student", backref="export_jobs", lazy=True)
+
+
 class Blog(db.Model):
     __tablename__ = "blogs"
 

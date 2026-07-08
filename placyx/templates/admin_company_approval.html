@@ -29,50 +29,91 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container mt-5">
+    <div id="company-approval-app" class="container mt-5">
+        <h2 class="mb-4 text-center">Pending Company Approvals</h2>
 
-    <h2 class="mb-4 text-center">Pending Company Approvals</h2>
+        {% if companies %}
+            <table class="table table-bordered table-hover bg-white">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Company Name</th>
+                        <th>HR Email</th>
+                        <th>Website</th>
+                        <th style="width: 220px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in companies %}
+                    <tr>
+                        <td>{{ company.name }}</td>
+                        <td>{{ company.hr_email }}</td>
+                        <td>{{ company.website }}</td>
+                        <td>
+                            <div v-if="statusMap[{{ company.id }}]" class="small fw-semibold text-success" v-text="statusMap[{{ company.id }}]"></div>
+                            <div v-else class="d-flex gap-2">
+                                <button class="btn btn-success btn-sm" @click="handleDecision({{ company.id }}, 'approve')" :disabled="loadingId === {{ company.id }}">
+                                    <span v-if="loadingId === {{ company.id }}">Working…</span>
+                                    <span v-else>Approve</span>
+                                </button>
+                                <button class="btn btn-danger btn-sm" @click="handleDecision({{ company.id }}, 'reject')" :disabled="loadingId === {{ company.id }}">
+                                    <span v-if="loadingId === {{ company.id }}">Working…</span>
+                                    <span v-else>Reject</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info text-center">
+                No pending company approvals.
+            </div>
+        {% endif %}
+    </div>
 
-    {% if companies %}
-        <table class="table table-bordered table-hover bg-white">
-            <thead class="table-dark">
-                <tr>
-                    <th>Company Name</th>
-                    <th>HR Email</th>
-                    <th>Website</th>
-                    <th style="width: 180px;">Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for company in companies %}
-                <tr>
-                    <td>{{ company.name }}</td>
-                    <td>{{ company.hr_email }}</td>
-                    <td>{{ company.website }}</td>
-                    <td>
-                        <a
-                          href="{{ url_for('approve_company', company_id=company.id) }}"
-                          class="btn btn-success btn-sm"
-                        >
-                          Approve
-                        </a>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
 
-                        <a
-                          href="{{ url_for('reject_company', company_id=company.id) }}"
-                          class="btn btn-danger btn-sm"
-                        >
-                          Reject
-                        </a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <div class="alert alert-info text-center">
-            No pending company approvals.
-        </div>
-    {% endif %}
+        createApp({
+            data() {
+                return {
+                    loadingId: null,
+                    statusMap: {}
+                };
+            },
+            methods: {
+                async handleDecision(companyId, action) {
+                    this.loadingId = companyId;
+                    const endpoint = action === 'approve'
+                        ? `/admin/company/approve/${companyId}`
+                        : `/admin/company/reject/${companyId}`;
 
-</div>
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'GET',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+
+                        let data = null;
+                        const contentType = response.headers.get('content-type') || '';
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        }
+
+                        if (!response.ok || !data?.success) {
+                            throw new Error(data?.message || 'Action failed');
+                        }
+
+                        this.statusMap[companyId] = data.message || (action === 'approve' ? 'Approved' : 'Rejected');
+                    } catch (error) {
+                        this.statusMap[companyId] = error.message || 'Action failed';
+                    } finally {
+                        this.loadingId = null;
+                    }
+                }
+            }
+        }).mount('#company-approval-app');
+    </script>
 {% endblock %}

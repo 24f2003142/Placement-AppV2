@@ -14,9 +14,11 @@
 {% endblock %}
 
 {% block content %}
-    <div class="container mt-5">
-
-        <h2 class="mb-4 text-center">Pending Job Post Approvals</h2>
+    <div id="job-approval-app" class="container mt-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Pending Job Post Approvals</h2>
+            <span class="text-muted small">{{ job_posts|length }} pending</span>
+        </div>
 
         {% if job_posts %}
         <table class="table table-bordered table-hover bg-white">
@@ -26,7 +28,7 @@
                     <th>Job Title</th>
                     <th>Eligibility</th>
                     <th>Deadline</th>
-                    <th style="width: 180px;">Action</th>
+                    <th style="width: 200px;">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -37,19 +39,17 @@
                     <td>{{ job.eligibility }}</td>
                     <td>{{ job.application_deadline }}</td>
                     <td>
-                        <a
-                        href="{{ url_for('approve_job', job_id=job.id) }}"
-                        class="btn btn-success btn-sm"
-                        >
-                        Approve
-                        </a>
-
-                        <a
-                        href="{{ url_for('reject_job', job_id=job.id) }}"
-                        class="btn btn-danger btn-sm"
-                        >
-                        Reject
-                        </a>
+                        <div v-if="actionState[{{ job.id }}]" class="small fw-semibold text-success" v-text="actionState[{{ job.id }}]"></div>
+                        <div v-else class="d-flex gap-2">
+                            <button class="btn btn-success btn-sm" @click="handleDecision({{ job.id }}, 'approve')" :disabled="loadingId === {{ job.id }}">
+                                <span v-if="loadingId === {{ job.id }}">Working…</span>
+                                <span v-else>Approve</span>
+                            </button>
+                            <button class="btn btn-danger btn-sm" @click="handleDecision({{ job.id }}, 'reject')" :disabled="loadingId === {{ job.id }}">
+                                <span v-if="loadingId === {{ job.id }}">Working…</span>
+                                <span v-else>Reject</span>
+                            </button>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
@@ -60,6 +60,50 @@
                 No pending job posts for approval.
             </div>
         {% endif %}
-
     </div>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <script>
+        const { createApp } = Vue;
+
+        createApp({
+            data() {
+                return {
+                    loadingId: null,
+                    actionState: {}
+                };
+            },
+            methods: {
+                async handleDecision(jobId, action) {
+                    this.loadingId = jobId;
+                    const endpoint = action === 'approve'
+                        ? `/admin/job/approve/${jobId}`
+                        : `/admin/job/reject/${jobId}`;
+
+                    try {
+                        const response = await fetch(endpoint, {
+                            method: 'GET',
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+
+                        let data = null;
+                        const contentType = response.headers.get('content-type') || '';
+                        if (contentType.includes('application/json')) {
+                            data = await response.json();
+                        }
+
+                        if (!response.ok || !data?.success) {
+                            throw new Error(data?.message || 'Action failed');
+                        }
+
+                        this.actionState[jobId] = data.message || (action === 'approve' ? 'Approved' : 'Rejected');
+                    } catch (error) {
+                        this.actionState[jobId] = error.message || 'Action failed';
+                    } finally {
+                        this.loadingId = null;
+                    }
+                }
+            }
+        }).mount('#job-approval-app');
+    </script>
 {% endblock %}

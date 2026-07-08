@@ -18,21 +18,138 @@
 {% block content %}
 <h3>Edit Company Profile</h3>
 
-<form method="POST" enctype="multipart/form-data" class="card p-4">
+<div class="container mt-5" id="profile-form-app">
+  <div class="card p-4 mx-auto" style="max-width: 600px;">
 
-    <label>Website</label>
-    <input class="form-control mb-3" name="website" value="{{ company.website }}">
+    <div v-if="message" :class="['alert', messageType === 'success' ? 'alert-success' : 'alert-danger']" role="alert">
+      {% raw %}{{ message }}{% endraw %}
+    </div>
 
-    <label>HR Email</label>
-    <input class="form-control mb-3" name="hr_email" value="{{ company.hr_email }}">
+    <form @submit.prevent="submitProfile" enctype="multipart/form-data">
 
-    <label>New Password</label>
-    <input type="password" class="form-control mb-3" name="password">
+      <label>Website</label>
+      <input 
+        v-model="form.website" 
+        class="form-control mb-3" 
+        type="url"
+        placeholder="https://example.com">
 
-    <label>Company Logo</label>
-    <input type="file" class="form-control mb-3" name="logo">
+      <label>HR Email</label>
+      <input 
+        v-model="form.hr_email" 
+        class="form-control mb-3" 
+        type="email">
 
-    <button class="btn btn-primary">Save Changes</button>
+      <label>New Password</label>
+      <input 
+        v-model="form.password" 
+        type="password" 
+        class="form-control mb-3" 
+        placeholder="Leave blank to keep current password">
 
-</form>
+      <label>Company Logo</label>
+      <div v-if="currentLogo" class="mb-3">
+        <p class="text-muted small">Current Logo:</p>
+        <img :src="currentLogo" class="img-fluid mb-3" style="max-width: 200px;">
+      </div>
+      
+      <div class="mb-3">
+        <input 
+          @change="previewImage" 
+          type="file" 
+          class="form-control mb-2" 
+          accept="image/*">
+        <small class="text-muted">Supported: JPG, PNG, GIF (Max 5MB)</small>
+      </div>
+
+      <div v-if="previewUrl" class="mb-3">
+        <p class="text-muted small">New Logo Preview:</p>
+        <img :src="previewUrl" class="img-fluid" style="max-width: 200px;">
+      </div>
+
+      <button 
+        type="submit" 
+        class="btn btn-primary w-100" 
+        :disabled="loading">
+        {% raw %}{{ loading ? 'Saving...' : 'Save Changes' }}{% endraw %}
+      </button>
+
+    </form>
+  </div>
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+  const { createApp } = Vue;
+  createApp({
+    data() {
+      return {
+        form: {
+          website: '{{ company.website or "" }}',
+          hr_email: '{{ company.hr_email or "" }}',
+          password: ''
+        },
+        currentLogo: '{{ url_for("static", filename="uploads/" + company.logo) if company.logo else "" }}',
+        previewUrl: '',
+        logoFile: null,
+        loading: false,
+        message: '',
+        messageType: 'success'
+      };
+    },
+    methods: {
+      previewImage(event) {
+        const file = event.target.files[0];
+        if (file) {
+          this.logoFile = file;
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.previewUrl = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+      },
+      async submitProfile() {
+        this.loading = true;
+        this.message = '';
+
+        try {
+          const formData = new FormData();
+          formData.append('website', this.form.website);
+          formData.append('hr_email', this.form.hr_email);
+          formData.append('password', this.form.password);
+          
+          if (this.logoFile) {
+            formData.append('logo', this.logoFile);
+          }
+
+          const response = await fetch(window.location.href, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+          });
+
+          const data = await response.json();
+
+          if (data.success) {
+            this.message = 'Profile updated successfully! Redirecting...';
+            this.messageType = 'success';
+            setTimeout(() => {
+              window.location.href = data.redirect;
+            }, 1500);
+          } else {
+            this.message = data.message || 'Failed to update profile';
+            this.messageType = 'error';
+          }
+        } catch (error) {
+          this.message = 'Error updating profile: ' + error.message;
+          this.messageType = 'error';
+          console.error(error);
+        } finally {
+          this.loading = false;
+        }
+      }
+    }
+  }).mount('#profile-form-app');
+</script>
 {% endblock %}
