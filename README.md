@@ -146,10 +146,13 @@ Relationships include:
 ```bash
 git clone https://github.com/24f2003142/Placement-App.git
 cd Placement-App/placyx
-./local.psi
+./local.ps1
 ```
 
-- These commands will launch create venv download necessary dependencies create database and launch the web application
+- These commands will create the virtual environment, install dependencies, create the database, and launch the web application.
+- Redis is required for Celery background jobs.
+- `local.ps1` will try to install Redis automatically if Scoop, Chocolatey, or winget is available.
+- If installation is not possible, `local.ps1` will still fall back to starting Redis via Docker or WSL when available.
 ---
 
 ## Default Admin Account
