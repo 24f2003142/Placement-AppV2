@@ -91,6 +91,7 @@ class Student(db.Model):
     roll_no = db.Column(db.String(50))
     branch = db.Column(db.String(100))
     cgpa = db.Column(db.Float)
+    year_of_study = db.Column(db.Integer)
     resume_path = db.Column(db.String(200))
     is_placed = db.Column(db.Boolean, default=False)
     notification_email = db.Column(db.String(120))
@@ -154,6 +155,9 @@ class JobPost(db.Model):
     title = db.Column(db.String(150), nullable=False)
     description = db.Column(db.Text)
     eligibility = db.Column(db.Text)
+    min_cgpa = db.Column(db.Float)
+    eligible_branches = db.Column(db.Text)
+    eligible_years = db.Column(db.Text)
     application_deadline = db.Column(db.Date)
     status = db.Column(
         db.String(20),
@@ -163,6 +167,44 @@ class JobPost(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     applications = db.relationship("Application", backref="job_post", lazy=True)
+
+    def _normalize_tokens(self, value):
+        if not value:
+            return set()
+        return {token.strip().upper() for token in str(value).split(",") if token and token.strip()}
+
+    def get_eligibility_reasons(self, student):
+        reasons = []
+
+        if self.min_cgpa is not None:
+            student_cgpa = getattr(student, "cgpa", None)
+            if student_cgpa is None or float(student_cgpa) < float(self.min_cgpa):
+                reasons.append(f"Minimum CGPA of {self.min_cgpa:.2f} is required.")
+
+        if self.eligible_branches:
+            student_branch = getattr(student, "branch", None)
+            allowed_branches = self._normalize_tokens(self.eligible_branches)
+            if not student_branch or student_branch.strip().upper() not in allowed_branches:
+                reasons.append(f"Eligible branches: {self.eligible_branches}.")
+
+        if self.eligible_years:
+            student_year = getattr(student, "year_of_study", None)
+            allowed_years = set()
+            for token in str(self.eligible_years).split(","):
+                token = token.strip()
+                if not token:
+                    continue
+                try:
+                    allowed_years.add(int(token))
+                except ValueError:
+                    continue
+            if student_year is None or int(student_year) not in allowed_years:
+                reasons.append(f"Eligible years: {self.eligible_years}.")
+
+        return reasons
+
+    def is_eligible_for(self, student):
+        return len(self.get_eligibility_reasons(student)) == 0
 
 
 # --------------------------------------------------
@@ -188,8 +230,11 @@ class Application(db.Model):
         db.String(30),
         nullable=False,
         default="APPLIED"
-        # APPLIED | SHORTLISTED | SELECTED | REJECTED
+        # APPLIED | SHORTLISTED | INTERVIEW_SCHEDULED | SELECTED | REJECTED
     )
+    interview_date = db.Column(db.DateTime)
+    interview_mode = db.Column(db.String(50))
+    interview_notes = db.Column(db.Text)
 
     __table_args__ = (
         db.UniqueConstraint(

@@ -48,6 +48,22 @@
 
 <div class="card p-4 mb-4">
     <p><strong>Application Status:</strong> {{ application.status }}</p>
+    {% if application.student.is_placed %}
+    <div class="alert alert-warning">
+        This student is already placed and should not be shortlisted or interviewed.
+    </div>
+    {% endif %}
+    {% if application.job_post.status != "CLOSED" %}
+        {% if application.interview_date %}
+        <p><strong>Interview Scheduled:</strong> {{ application.interview_date.strftime('%Y-%m-%d %H:%M') }}</p>
+        {% endif %}
+        {% if application.interview_mode %}
+        <p><strong>Interview Mode:</strong> {{ application.interview_mode }}</p>
+        {% endif %}
+        {% if application.interview_notes %}
+        <p><strong>Interview Notes:</strong> {{ application.interview_notes }}</p>
+        {% endif %}
+    {% endif %}
 </div>
 
 <div class="card p-4 mb-4">
@@ -67,23 +83,48 @@
 </div>
 
 
-{% if application.job_post.status != "CLOSED" %}
-<div id="company-candidate-details-app" class="d-flex gap-2 align-items-center" data-back-url="{{ back_url }}">
-  <button @click="updateStatus('SHORTLISTED')" :disabled="loading" class="btn btn-warning">
-    <span v-text="loading && action === 'SHORTLISTED' ? 'Working…' : 'Shortlist'"></span>
-  </button>
+{% if application.job_post.status != "CLOSED" and not application.student.is_placed %}
+<div id="company-candidate-details-app" class="card p-4 mb-4" data-back-url="{{ back_url }}">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+    <button @click="updateStatus('SHORTLISTED')" :disabled="loading" class="btn btn-warning">
+      <span v-text="loading && action === 'SHORTLISTED' ? 'Working…' : 'Shortlist'"></span>
+    </button>
 
-  <button @click="updateStatus('SELECTED')" :disabled="loading" class="btn btn-success">
-    <span v-text="loading && action === 'SELECTED' ? 'Working…' : 'Select'"></span>
-  </button>
+    <button @click="updateStatus('SELECTED')" :disabled="loading" class="btn btn-success">
+      <span v-text="loading && action === 'SELECTED' ? 'Working…' : 'Select'"></span>
+    </button>
 
-  <button @click="updateStatus('REJECTED')" :disabled="loading" class="btn btn-danger">
-    <span v-text="loading && action === 'REJECTED' ? 'Working…' : 'Reject'"></span>
-  </button>
-</div>
+    <button @click="updateStatus('REJECTED')" :disabled="loading" class="btn btn-danger">
+      <span v-text="loading && action === 'REJECTED' ? 'Working…' : 'Reject'"></span>
+    </button>
+  </div>
 
-<div v-if="message" class="alert mt-3" :class="messageType === 'success' ? 'alert-success' : 'alert-danger'">
-  <span v-text="message"></span>
+  <div class="border rounded p-3">
+    <h5 class="mb-3">Schedule Interview</h5>
+    <form @submit.prevent="scheduleInterview">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Date & Time</label>
+          <input v-model="interviewForm.date" type="datetime-local" class="form-control" required>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Mode</label>
+          <input v-model="interviewForm.mode" type="text" class="form-control" placeholder="Online / Onsite / Phone">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Notes</label>
+          <input v-model="interviewForm.notes" type="text" class="form-control" placeholder="Optional notes">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary mt-3" :disabled="savingInterview">
+        <span v-text="savingInterview ? 'Scheduling…' : 'Schedule Interview'"></span>
+      </button>
+    </form>
+  </div>
+
+  <div v-if="message" class="alert mt-3" :class="messageType === 'success' ? 'alert-success' : 'alert-danger'">
+    <span v-text="message"></span>
+  </div>
 </div>
 {% else %}
 <span class="badge bg-secondary">Job Closed</span>
@@ -98,9 +139,15 @@
       return {
         loading: false,
         action: null,
+        savingInterview: false,
         message: '',
         messageType: 'success',
-        backUrl: root ? root.dataset.backUrl : '/company/jobs'
+        backUrl: root ? root.dataset.backUrl : '/company/jobs',
+        interviewForm: {
+          date: '',
+          mode: '',
+          notes: ''
+        }
       };
     },
     methods: {
@@ -131,6 +178,39 @@
         } finally {
           this.loading = false;
           this.action = null;
+        }
+      },
+      async scheduleInterview() {
+        this.savingInterview = true;
+        this.message = '';
+
+        try {
+          const formData = new FormData();
+          formData.append('interview_date', this.interviewForm.date);
+          formData.append('interview_mode', this.interviewForm.mode);
+          formData.append('interview_notes', this.interviewForm.notes);
+
+          const response = await fetch(`/company/application/{{ application.id }}/schedule-interview`, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+          });
+          const data = await response.json();
+          if (response.ok && data.success) {
+            this.message = data.message || 'Interview scheduled successfully.';
+            this.messageType = 'success';
+            setTimeout(() => {
+              window.location.href = this.backUrl;
+            }, 500);
+          } else {
+            this.message = data.message || 'Failed to schedule interview.';
+            this.messageType = 'error';
+          }
+        } catch (error) {
+          this.message = 'Unable to schedule interview.';
+          this.messageType = 'error';
+        } finally {
+          this.savingInterview = false;
         }
       }
     }

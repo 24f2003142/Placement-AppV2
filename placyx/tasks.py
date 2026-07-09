@@ -143,6 +143,7 @@ def send_admin_monthly_report():
     ).all()
     total_applications = len(applications)
     selected_count = sum(1 for app in applications if app.status == "SELECTED")
+    interview_scheduled_count = sum(1 for app in applications if app.status == "INTERVIEW_SCHEDULED")
 
     # Prefer Admin.notification_email if configured; fall back to the admin user's registered email
     admin_user = User.query.filter_by(role="ADMIN").first()
@@ -165,6 +166,7 @@ def send_admin_monthly_report():
         <ul>
           <li><strong>Drives created:</strong> {total_drives}</li>
           <li><strong>Applications submitted:</strong> {total_applications}</li>
+          <li><strong>Interviews scheduled:</strong> {interview_scheduled_count}</li>
           <li><strong>Students selected:</strong> {selected_count}</li>
         </ul>
         <table border='1' cellpadding='6' cellspacing='0'>
@@ -207,6 +209,7 @@ def send_admin_monthly_report():
         "admin_email": admin_email,
         "drives": total_drives,
         "applications": total_applications,
+        "interview_scheduled": interview_scheduled_count,
         "selected": selected_count
     }
 
@@ -230,14 +233,26 @@ def generate_student_csv_export(student_id: int, export_job_id: int):
         applications = Application.query.filter_by(student_id=student.id).all()
         with open(filepath, "w", newline='', encoding='utf-8') as csvfile:
             csv_writer = writer(csvfile)
-            csv_writer.writerow(["Application ID", "Job Title", "Company", "Status", "Applied On"])
+            csv_writer.writerow([
+                "Application ID",
+                "Job Title",
+                "Company",
+                "Status",
+                "Applied On",
+                "Interview Date",
+                "Interview Mode",
+                "Interview Notes"
+            ])
             for app in applications:
                 csv_writer.writerow([
                     app.id,
                     app.job_post.title,
                     app.job_post.company.name,
                     app.status,
-                    app.applied_on.strftime('%Y-%m-%d %H:%M:%S')
+                    app.applied_on.strftime('%Y-%m-%d %H:%M:%S'),
+                    app.interview_date.strftime('%Y-%m-%d %H:%M:%S') if app.interview_date else "",
+                    app.interview_mode or "",
+                    app.interview_notes or ""
                 ])
 
         job.status = "COMPLETED"

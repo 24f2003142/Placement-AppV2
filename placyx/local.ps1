@@ -167,9 +167,11 @@ if (-not $redisReady) {
 }
 
 # Step 6: Run Flask app, Celery worker, and Celery beat
-Start-Process python app.py
-Start-Process python -ArgumentList "-m celery -A celery_app.celery worker --loglevel=info --pool=solo"
-Start-Process python -ArgumentList "-m celery -A celery_app.celery beat --loglevel=info"
+$pythonExe = if (Test-Path "venv\Scripts\python.exe") { Join-Path $PWD "venv\Scripts\python.exe" } else { $pythonCmd }
+
+Start-Process -FilePath $pythonExe -ArgumentList "app.py"
+Start-Process -FilePath $pythonExe -ArgumentList @("-m", "celery", "-A", "celery_app.celery", "worker", "--loglevel=info", "--pool=solo")
+Start-Process -FilePath $pythonExe -ArgumentList @("-m", "celery", "-A", "celery_app.celery", "beat", "--loglevel=info")
 
 # Step 7: Open browser
 Start-Sleep -Seconds 1

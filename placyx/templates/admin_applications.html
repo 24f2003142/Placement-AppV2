@@ -22,6 +22,7 @@
                 <option value="">All statuses</option>
                 <option value="PENDING">Pending</option>
                 <option value="SHORTLISTED">Shortlisted</option>
+                <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
                 <option value="SELECTED">Selected</option>
                 <option value="REJECTED">Rejected</option>
             </select>
@@ -36,6 +37,7 @@
     <th>Company</th>
     <th>Job</th>
     <th>Status</th>
+    <th>Interview</th>
     </tr>
     </thead>
 
@@ -46,6 +48,14 @@
     <td>{{ app.job_post.company.name }}</td>
     <td>{{ app.job_post.title }}</td>
     <td>{{ app.status }}</td>
+    <td>
+      {% if app.interview_date %}
+        {{ app.interview_date.strftime('%Y-%m-%d %H:%M') }}
+        {% if app.interview_mode %}({{ app.interview_mode }}){% endif %}
+      {% else %}
+        —
+      {% endif %}
+    </td>
     </tr>
     {% endfor %}
     </tbody>

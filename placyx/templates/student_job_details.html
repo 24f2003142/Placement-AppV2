@@ -51,19 +51,32 @@
 
         <div class="card p-4 mb-4">
             <h5>Eligibility Criteria</h5>
-            <p>{{ job.eligibility }}</p>
+            {% if job.eligibility %}
+                <p>{{ job.eligibility }}</p>
+            {% endif %}
+            <p><strong>Minimum CGPA:</strong> {{ job.min_cgpa if job.min_cgpa is not none else 'Any CGPA' }}</p>
+            <p><strong>Eligible Branches:</strong> {{ job.eligible_branches if job.eligible_branches else 'Any branch' }}</p>
+            <p><strong>Eligible Years:</strong> {{ job.eligible_years if job.eligible_years else 'Any year' }}</p>
             <p><strong>Deadline:</strong> {{ job.application_deadline }}</p>
         </div>
 
         {% if job.status == "APPROVED" and not current_user.student.is_placed %}
-            <div v-if="!applied" class="d-flex align-items-center gap-2">
-                <button type="button" class="btn btn-primary" @click="applyJob" :disabled="loading">
-                    {% raw %}{{ loading ? 'Applying...' : 'Apply Now' }}{% endraw %}
-                </button>
-            </div>
-            <div v-else>
+            {% if has_applied %}
                 <span class="badge bg-success">Applied</span>
-            </div>
+            {% elif eligibility_info.eligible %}
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-primary" @click="applyJob" :disabled="loading">
+                        {% raw %}{{ loading ? 'Applying...' : 'Apply Now' }}{% endraw %}
+                    </button>
+                </div>
+            {% else %}
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                    You are not eligible to apply for this drive.
+                    {% if eligibility_info.reasons %}
+                        {{ eligibility_info.reasons|join(' ') }}
+                    {% endif %}
+                </div>
+            {% endif %}
             <div v-if="message" class="alert alert-success mt-3 mb-0" role="alert">
                 {% raw %}{{ message }}{% endraw %}
             </div>
@@ -92,12 +105,17 @@
                     try {
                         const response = await fetch(`/student/job/apply/{{ job.id }}`, {
                             method: 'POST',
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json'
+                            }
                         });
                         const data = await response.json();
                         if (response.ok && data.success) {
                             this.applied = true;
-                            this.message = data.message || 'You have applied successfully for this job.';
+                            this.message = data.message || 'Applying...';
+                            window.location.href = '/student/applications';
+                            return;
                         } else {
                             this.message = data.message || 'Unable to apply right now.';
                         }

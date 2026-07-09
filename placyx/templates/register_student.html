@@ -48,6 +48,7 @@
             <input class="form-control mb-2" name="roll_no" v-model="formData.roll_no" placeholder="Roll Number">
             <input class="form-control mb-2" name="branch" v-model="formData.branch" placeholder="Branch">
             <input class="form-control mb-2" name="cgpa" v-model="formData.cgpa" type="number" step="0.01" placeholder="CGPA">
+            <input class="form-control mb-2" name="year_of_study" v-model="formData.yearOfStudy" type="number" min="1" placeholder="Year of Study">
             <input class="form-control mb-2" name="email" v-model="formData.email" type="email" placeholder="Email" required>
             <input class="form-control mb-3" name="password" v-model="formData.password" type="password" placeholder="Password" required>
 
@@ -72,6 +73,7 @@
                     roll_no: '',
                     branch: '',
                     cgpa: '',
+                    yearOfStudy: '',
                     email: '',
                     password: ''
                 },

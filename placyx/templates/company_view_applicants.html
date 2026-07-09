@@ -27,6 +27,7 @@
           <option value="">All statuses</option>
           <option value="APPLIED">Applied</option>
           <option value="SHORTLISTED">Shortlisted</option>
+          <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
           <option value="SELECTED">Selected</option>
           <option value="REJECTED">Rejected</option>
         </select>
@@ -40,6 +41,7 @@
           <th>Branch</th>
           <th>CGPA</th>
           <th>Status</th>
+          <th>Interview</th>
           <th>Action</th>
         </tr>
       </thead>
@@ -50,19 +52,32 @@
           <td v-text="app.cgpa"></td>
           <td>
             <span v-if="app.status === 'SELECTED'" class="badge bg-success">Selected</span>
+            <span v-else-if="app.status === 'INTERVIEW_SCHEDULED'" class="badge bg-primary">Interview Scheduled</span>
             <span v-else-if="app.status === 'SHORTLISTED'" class="badge bg-info">Shortlisted</span>
             <span v-else-if="app.status === 'REJECTED'" class="badge bg-danger">Rejected</span>
             <span v-else class="badge bg-secondary">Applied</span>
+          </td>
+          <td>
+            <div v-if="app.interview_date">
+              <div v-text="app.interview_date"></div>
+              <div v-if="app.interview_mode" class="text-muted small" v-text="app.interview_mode"></div>
+            </div>
+            <span v-else class="text-muted">Not scheduled</span>
           </td>
           <td>
             <template v-if="jobClosed">
               <span class="badge bg-secondary">Drive Closed</span>
             </template>
             <template v-else>
-              <template v-if="app.status === 'APPLIED'">
+              <template v-if="app.placed">
+                <span class="badge bg-warning">Already Placed</span>
+                <a :href="app.details_url" class="btn btn-outline-primary btn-sm ms-1">View Details</a>
+              </template>
+              <template v-else-if="app.status === 'APPLIED'">
                 <button @click="updateStatus(app.id, 'SHORTLISTED')" :disabled="app.loading" class="btn btn-warning btn-sm">
                   <span v-text="app.loading && app.action === 'SHORTLISTED' ? '...' : 'Shortlist'"></span>
                 </button>
+                <a :href="app.details_url" class="btn btn-outline-primary btn-sm">Schedule</a>
                 <button @click="updateStatus(app.id, 'REJECTED')" :disabled="app.loading" class="btn btn-danger btn-sm">
                   <span v-text="app.loading && app.action === 'REJECTED' ? '...' : 'Reject'"></span>
                 </button>
@@ -77,13 +92,16 @@
                 <button @click="updateStatus(app.id, 'SELECTED')" :disabled="app.loading" class="btn btn-success btn-sm">
                   <span v-text="app.loading && app.action === 'SELECTED' ? '...' : 'Select'"></span>
                 </button>
-                <button class="btn btn-warning btn-sm" disabled>Shortlisted</button>
+                <a :href="app.details_url" class="btn btn-outline-primary btn-sm">Schedule</a>
               </template>
               <template v-else-if="app.status === 'REJECTED'">
                 <button class="btn btn-danger btn-sm" disabled>Rejected</button>
               </template>
               <template v-else-if="app.status === 'SELECTED'">
                 <button class="btn btn-success btn-sm" disabled>Selected</button>
+              </template>
+              <template v-else-if="app.status === 'INTERVIEW_SCHEDULED'">
+                <button class="btn btn-primary btn-sm" disabled>Interview Scheduled</button>
               </template>
               <a :href="app.details_url" class="btn btn-outline-primary btn-sm ms-1">View Details</a>
             </template>
@@ -111,7 +129,11 @@
               branch: {{ app.student.branch|tojson }},
               cgpa: {{ app.student.cgpa|tojson }},
               status: {{ app.status|tojson }},
-              details_url: {{ url_for('company_view_candidate', app_id=app.id)|tojson }},
+              interview_date: {{ (app.interview_date.strftime('%Y-%m-%d %H:%M') if app.interview_date else '')|tojson }},
+              interview_mode: {{ app.interview_mode|tojson }},
+              interview_notes: {{ app.interview_notes|tojson }},
+                  details_url: {{ url_for('company_view_candidate', app_id=app.id)|tojson }},
+              placed: {{ 'true' if app.student.is_placed else 'false' }},
               loading: false,
               action: null
             }{% if not loop.last %},{% endif %}
@@ -125,7 +147,7 @@
           return this.applications.filter(app => {
             const statusMatch = !this.statusFilter || app.status === this.statusFilter;
             if (!query) return statusMatch;
-            const haystack = `${app.student_name} ${app.branch} ${app.cgpa} ${app.status}`.toLowerCase();
+            const haystack = `${app.student_name} ${app.branch} ${app.cgpa} ${app.status} ${app.interview_date || ''} ${app.interview_mode || ''}`.toLowerCase();
             return statusMatch && haystack.includes(query);
           });
         }

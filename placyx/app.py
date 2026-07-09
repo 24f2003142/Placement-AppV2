@@ -5,22 +5,25 @@ from models import db, User, College, Admin, Company, Student, JobPost, Blog, Ap
 from tasks import generate_student_csv_export
 from flask import request, render_template, redirect, url_for, flash, jsonify, send_file
 from flask_login import login_user, login_required, current_user, logout_user, LoginManager
+from flask_caching import Cache
 from werkzeug.security import check_password_hash,generate_password_hash
 from datetime import datetime
 from werkzeug.utils import secure_filename
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 
 
 
 login_manager = LoginManager()
 login_manager.login_view = "login"
 login_manager.login_message_category = "info"
+cache = Cache()
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
     db.init_app(app)
+    cache.init_app(app)
     login_manager.init_app(app)
 
     def get_current_student():
@@ -41,8 +44,38 @@ def create_app():
         def allowed_file(filename):
             return "." in filename and \
                 filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
-        # CREATE DATABASE & TABLES PROGRAMMATICALLY
-        db.create_all()
+        def ensure_eligibility_schema():
+            db.create_all()
+
+            inspector = inspect(db.engine)
+            existing_tables = set(inspector.get_table_names())
+
+            if "students" in existing_tables:
+                student_columns = {column["name"] for column in inspector.get_columns("students")}
+                if "year_of_study" not in student_columns:
+                    db.session.execute(text("ALTER TABLE students ADD COLUMN year_of_study INTEGER"))
+
+            if "job_posts" in existing_tables:
+                job_columns = {column["name"] for column in inspector.get_columns("job_posts")}
+                if "min_cgpa" not in job_columns:
+                    db.session.execute(text("ALTER TABLE job_posts ADD COLUMN min_cgpa FLOAT"))
+                if "eligible_branches" not in job_columns:
+                    db.session.execute(text("ALTER TABLE job_posts ADD COLUMN eligible_branches TEXT"))
+                if "eligible_years" not in job_columns:
+                    db.session.execute(text("ALTER TABLE job_posts ADD COLUMN eligible_years TEXT"))
+
+            if "applications" in existing_tables:
+                application_columns = {column["name"] for column in inspector.get_columns("applications")}
+                if "interview_date" not in application_columns:
+                    db.session.execute(text("ALTER TABLE applications ADD COLUMN interview_date DATETIME"))
+                if "interview_mode" not in application_columns:
+                    db.session.execute(text("ALTER TABLE applications ADD COLUMN interview_mode VARCHAR(50)"))
+                if "interview_notes" not in application_columns:
+                    db.session.execute(text("ALTER TABLE applications ADD COLUMN interview_notes TEXT"))
+
+            db.session.commit()
+
+        ensure_eligibility_schema()
 
         # Create default college + admin ONLY if not exists
         if not College.query.first():
@@ -179,6 +212,7 @@ def create_app():
 
     @app.route("/admin/dashboard")
     @login_required
+    @cache.cached(timeout=120, key_prefix=lambda: f"admin_dashboard_{current_user.id}")
     def admin_dashboard():
         if current_user.role != "ADMIN":
             return "Unauthorized", 403
@@ -231,8 +265,9 @@ def create_app():
             password = request.form["password"]
             name = request.form["name"]
             roll_no = request.form["roll_no"]
-            branch = request.form["branch"]
-            cgpa = request.form["cgpa"]
+            branch = request.form.get("branch", "")
+            cgpa = request.form.get("cgpa") or None
+            year_of_study = request.form.get("year_of_study") or None
 
             if User.query.filter_by(email=email).first():
                 flash("Email already registered")
@@ -253,7 +288,8 @@ def create_app():
                 name=name,
                 roll_no=roll_no,
                 branch=branch,
-                cgpa=cgpa
+                cgpa=float(cgpa) if cgpa else None,
+                year_of_study=int(year_of_study) if year_of_study else None
             )
             db.session.add(student)
             db.session.commit()
@@ -527,6 +563,7 @@ def create_app():
 
     @app.route("/company/dashboard")
     @login_required
+    @cache.cached(timeout=120, key_prefix=lambda: f"company_dashboard_{current_user.id}")
     def company_dashboard():
         if current_user.role != "COMPANY":
             return "Unauthorized", 403
@@ -555,6 +592,11 @@ def create_app():
             Application.status == "REJECTED"
         ).count()
 
+        interview_scheduled = Application.query.join(JobPost).filter(
+            JobPost.company_id == company.id,
+            Application.status == "INTERVIEW_SCHEDULED"
+        ).count()
+
         return render_template(
             "company_dashboard.html",
             company=company,
@@ -562,7 +604,8 @@ def create_app():
             total_applications=total_applications,
             shortlisted=shortlisted,
             selected=selected,
-            rejected=rejected
+            rejected=rejected,
+            interview_scheduled=interview_scheduled
         )
 
 
@@ -574,12 +617,16 @@ def create_app():
 
         if request.method == "POST":
             try:
+                cgpa_value = request.form.get("min_cgpa") or None
                 job = JobPost(
                     company_id=current_user.company.id,
                     college_id=current_user.company.college_id,
                     title=request.form["title"],
                     description=request.form["description"],
-                    eligibility=request.form["eligibility"],
+                    eligibility=request.form.get("eligibility", ""),
+                    min_cgpa=float(cgpa_value) if cgpa_value else None,
+                    eligible_branches=request.form.get("eligible_branches", ""),
+                    eligible_years=request.form.get("eligible_years", ""),
                     application_deadline = datetime.strptime(request.form["deadline"], "%Y-%m-%d").date(),
                     status="PENDING"
                 )
@@ -635,30 +682,57 @@ def create_app():
 
         status = status.upper()
 
-        if status in ["SHORTLISTED", "REJECTED", "SELECTED"]:
+        if application.job_post.status == "CLOSED":
+            message = "Drive is closed and cannot be updated."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        if application.student.is_placed and status in ["SHORTLISTED", "INTERVIEW_SCHEDULED", "SELECTED"]:
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": "Student is already placed and cannot be shortlisted or interviewed."}), 400
+            flash("Student is already placed and cannot be shortlisted or interviewed.", "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        if status in ["SHORTLISTED", "REJECTED", "SELECTED", "INTERVIEW_SCHEDULED"]:
             application.status = status
+            job = application.job_post
 
             # 🔑 PLACEMENT LOGIC
             if status == "SELECTED":
                 application.student.is_placed = True
+                job.status = "CLOSED"
+                Application.query.filter(
+                    Application.job_post_id == application.job_post_id,
+                    Application.id != application.id
+                ).update({Application.status: "REJECTED"})
+                Application.query.filter(
+                    Application.job_post_id == application.job_post_id
+                ).update({
+                    Application.interview_date: None,
+                    Application.interview_mode: None,
+                    Application.interview_notes: None
+                })
 
             db.session.commit()
+            cache.clear()
 
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({
-                    "success": True,
-                    "message": f"Application {status.lower()} successfully",
-                    "status": status,
-                    "job_closed": status == "SELECTED"
-                })
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({
+                "success": True,
+                "message": f"Application {status.lower()} successfully",
+                "status": status,
+                "job_closed": status == "SELECTED"
+            })
 
         return redirect(
             url_for("view_applicants", job_id=application.job_post_id)
         )
 
-    @app.route("/company/application/<int:app_id>/shortlist")
+    @app.route("/company/application/<int:app_id>/schedule-interview", methods=["POST"])
     @login_required
-    def shortlist_application(app_id):
+    def schedule_interview(app_id):
         if current_user.role != "COMPANY":
             return "Unauthorized", 403
 
@@ -667,15 +741,54 @@ def create_app():
         if application.job_post.company_id != current_user.company.id:
             return "Unauthorized", 403
 
-        application.status = "SHORTLISTED"
+        if application.job_post.status == "CLOSED":
+            message = "Drive is closed and cannot be scheduled for interview."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        if application.student.is_placed:
+            message = "Student is already placed and cannot be scheduled for interview."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        interview_date = request.form.get("interview_date", "").strip()
+        interview_mode = request.form.get("interview_mode", "").strip()
+        interview_notes = request.form.get("interview_notes", "").strip()
+
+        if not interview_date:
+            message = "Interview date is required."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        try:
+            application.interview_date = datetime.strptime(interview_date, "%Y-%m-%dT%H:%M")
+        except ValueError:
+            message = "Interview date format is invalid."
+            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+                return jsonify({"success": False, "message": message}), 400
+            flash(message, "error")
+            return redirect(url_for("view_applicants", job_id=application.job_post_id))
+
+        application.interview_mode = interview_mode or None
+        application.interview_notes = interview_notes or None
+        application.status = "INTERVIEW_SCHEDULED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"success": True, "message": "Application shortlisted", "status": "SHORTLISTED"})
+            return jsonify({
+                "success": True,
+                "message": "Interview scheduled successfully",
+                "status": "INTERVIEW_SCHEDULED"
+            })
 
-        return redirect(
-            url_for("view_applicants", job_id=application.job_post_id)
-        )
+        return redirect(url_for("view_applicants", job_id=application.job_post_id))
 
     @app.route("/company/application/<int:app_id>/reject")
     @login_required
@@ -690,6 +803,7 @@ def create_app():
 
         application.status = "REJECTED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Application rejected", "status": "REJECTED"})
@@ -742,6 +856,7 @@ def create_app():
 
     @app.route("/student/dashboard")
     @login_required
+    @cache.cached(timeout=120, key_prefix=lambda: f"student_dashboard_{current_user.id}")
     def student_dashboard():
         if current_user.role != "STUDENT":
             return "Unauthorized", 403
@@ -760,10 +875,18 @@ def create_app():
             for application in Application.query.filter_by(student_id=student.id).all()
         ]
 
+        eligibility_map = {}
+        for job in jobs:
+            eligibility_map[job.id] = {
+                "eligible": job.is_eligible_for(student),
+                "reasons": job.get_eligibility_reasons(student),
+            }
+
         return render_template(
             "student_dashboard.html",
             jobs=jobs,
-            applied_job_ids=applied_job_ids
+            applied_job_ids=applied_job_ids,
+            eligibility_map=eligibility_map
         )
 
     @app.route("/student/profile", methods=["GET", "POST"])
@@ -779,7 +902,8 @@ def create_app():
         if request.method == "POST":
             try:
                 student.branch = request.form.get("branch", "")
-                student.cgpa = request.form.get("cgpa", "")
+                student.cgpa = float(request.form.get("cgpa")) if request.form.get("cgpa") else None
+                student.year_of_study = int(request.form.get("year_of_study")) if request.form.get("year_of_study") else None
                 student.notification_email = request.form.get("notification_email", "")
                 student.receive_notifications = request.form.get("receive_notifications") == "on"
 
@@ -870,27 +994,28 @@ def create_app():
 
         return send_file(export_job.file_path, as_attachment=True)
 
-    @app.route("/student/job/apply/<int:job_id>", methods=["GET", "POST"])
+    @app.route("/student/job/apply/<int:job_id>", methods=["POST"])
     @login_required
     def apply_job(job_id):
         if current_user.role != "STUDENT":
-            return "Unauthorized", 403
+            return jsonify({"success": False, "message": "Unauthorized"}), 403
 
         student = get_current_student()
         if not student:
-            return "Student profile not found", 404
+            return jsonify({"success": False, "message": "Student profile not found"}), 404
 
         job = JobPost.query.get_or_404(job_id)
 
         if job.status != "APPROVED":
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"success": False, "message": "This drive is no longer open."}), 400
-            return redirect(url_for("student_dashboard"))
+            return jsonify({"success": False, "message": "This drive is no longer open."}), 400
 
         if student.is_placed:
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"success": False, "message": "You are already placed."}), 400
-            return redirect(url_for("student_dashboard"))
+            return jsonify({"success": False, "message": "You are already placed."}), 400
+
+        if not job.is_eligible_for(student):
+            reasons = " ".join(job.get_eligibility_reasons(student))
+            message = "You do not meet the eligibility criteria for this drive." + (f" {reasons}" if reasons else "")
+            return jsonify({"success": False, "message": message}), 400
 
         existing = Application.query.filter_by(
             student_id=student.id,
@@ -898,9 +1023,7 @@ def create_app():
         ).first()
 
         if existing:
-            if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                return jsonify({"success": True, "message": "You already applied for this job.", "applied": True})
-            return redirect(url_for("student_applications"))
+            return jsonify({"success": True, "message": "You already applied for this job.", "applied": True})
 
         application = Application(
             student_id=student.id,
@@ -910,10 +1033,9 @@ def create_app():
 
         db.session.add(application)
         db.session.commit()
+        cache.clear()
 
-        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-            return jsonify({"success": True, "message": "You have applied successfully for this job.", "applied": True})
-        return redirect(url_for("student_applications"))
+        return jsonify({"success": True, "message": "You have applied successfully for this job.", "applied": True})
     
     @app.route("/student/job/<int:job_id>")
     @login_required
@@ -936,11 +1058,17 @@ def create_app():
             job_post_id=job_id
         ).first() is not None
 
+        eligibility_info = {
+            "eligible": job.is_eligible_for(student),
+            "reasons": job.get_eligibility_reasons(student),
+        }
+
         return render_template(
             "student_job_details.html",
             job=job,
             back_url=url_for("student_dashboard"),
-            has_applied=has_applied
+            has_applied=has_applied,
+            eligibility_info=eligibility_info
         )
 
     @app.route("/student/applications")
@@ -985,11 +1113,19 @@ def create_app():
             Application.job_post_id == job.id,
             Application.id != application.id
         ).update({Application.status: "REJECTED"})
+        Application.query.filter(
+            Application.job_post_id == job.id
+        ).update({
+            Application.interview_date: None,
+            Application.interview_mode: None,
+            Application.interview_notes: None
+        })
 
         # Close the job posting
         job.status = "CLOSED"
 
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Student selected and drive closed", "status": "SELECTED", "job_closed": True})
@@ -1025,7 +1161,15 @@ def create_app():
             return "Unauthorized", 403
 
         job.status = "CLOSED"
+        Application.query.filter(
+            Application.job_post_id == job_id
+        ).update({
+            Application.interview_date: None,
+            Application.interview_mode: None,
+            Application.interview_notes: None
+        })
         db.session.commit()
+        cache.clear()
 
         return redirect(url_for("company_jobs"))
     

@@ -38,7 +38,21 @@
           <textarea 
             v-model="form.eligibility" 
             class="form-control mb-2" 
-            placeholder="Eligibility Criteria"></textarea>
+            placeholder="Eligibility Criteria (free-text)"></textarea>
+          <input 
+            v-model="form.minCgpa" 
+            class="form-control mb-2" 
+            type="number"
+            step="0.01"
+            placeholder="Minimum CGPA (optional)">
+          <input 
+            v-model="form.eligibleBranches" 
+            class="form-control mb-2" 
+            placeholder="Eligible Branches (comma separated, e.g. CSE, ECE)">
+          <input 
+            v-model="form.eligibleYears" 
+            class="form-control mb-3" 
+            placeholder="Eligible Years (comma separated, e.g. 2,3,4)">
           <label for="applicationEndDate">Application End Date</label>
           <input 
             v-model="form.deadline" 
@@ -66,6 +80,9 @@
             title: '',
             description: '',
             eligibility: '',
+            minCgpa: '',
+            eligibleBranches: '',
+            eligibleYears: '',
             deadline: ''
           },
           loading: false,
@@ -89,6 +106,9 @@
             formData.append('title', this.form.title);
             formData.append('description', this.form.description);
             formData.append('eligibility', this.form.eligibility);
+            formData.append('min_cgpa', this.form.minCgpa);
+            formData.append('eligible_branches', this.form.eligibleBranches);
+            formData.append('eligible_years', this.form.eligibleYears);
             formData.append('deadline', this.form.deadline);
 
             const response = await fetch(window.location.href, {

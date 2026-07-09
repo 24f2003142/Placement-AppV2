@@ -14,6 +14,10 @@ class Config:
     CELERY_TIMEZONE = os.environ.get("CELERY_TIMEZONE", "UTC")
     CELERY_ENABLE_UTC = True
 
+    CACHE_TYPE = os.environ.get("CACHE_TYPE", "RedisCache")
+    CACHE_REDIS_URL = os.environ.get("CACHE_REDIS_URL", "redis://localhost:6379/2")
+    CACHE_DEFAULT_TIMEOUT = int(os.environ.get("CACHE_DEFAULT_TIMEOUT", 120))
+
     # Ensure schedule values are integers (can be overridden with env vars)
     DAILY_REMINDER_HOUR = int(os.environ.get("DAILY_REMINDER_HOUR", 23))
     DAILY_REMINDER_MINUTE = int(os.environ.get("DAILY_REMINDER_MINUTE", 45))

@@ -52,19 +52,37 @@
                             </a>
 
                             {% if not current_user.student.is_placed %}
-                                <button v-if="!appliedJobIds.includes({{ job.id }})"
-                                    type="button"
-                                    class="btn btn-primary btn-sm"
-                                    @click="applyJob({{ job.id }})"
-                                    :disabled="loadingJobId === {{ job.id }}">
-                                    <span v-if="loadingJobId === {{ job.id }}">Applying…</span>
-                                    <span v-else>Apply</span>
-                                </button>
-                                <span v-else class="badge bg-success align-self-center">Applied</span>
+                                {% if job.id in applied_job_ids %}
+                                    <span class="badge bg-success align-self-center">Applied</span>
+                                {% elif eligibility_map[job.id].eligible %}
+                                    <button
+                                        type="button"
+                                        class="btn btn-primary btn-sm"
+                                        @click="applyJob({{ job.id }})"
+                                        :disabled="loadingJobId === {{ job.id }}">
+                                        <span v-if="loadingJobId === {{ job.id }}">Applying…</span>
+                                        <span v-else>Apply</span>
+                                    </button>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark align-self-center">Not Eligible</span>
+                                {% endif %}
                             {% else %}
                                 <span class="badge bg-success align-self-center">Placed</span>
                             {% endif %}
                         </div>
+                        <div class="small text-muted mt-2">
+                            <strong>Eligibility:</strong>
+                            {% if eligibility_map[job.id].reasons %}
+                                {{ eligibility_map[job.id].reasons|join(' ') }}
+                            {% else %}
+                                No special restrictions.
+                            {% endif %}
+                        </div>
+                        {% if not eligibility_map[job.id].eligible and not current_user.student.is_placed and job.id not in applied_job_ids %}
+                        <div class="alert alert-warning small mt-3 mb-0" role="alert">
+                            You are not eligible to apply for this drive yet.
+                        </div>
+                        {% endif %}
                         <div v-if="messageMap[{{ job.id }}]" class="alert alert-success small mt-3 mb-0" role="alert">
                             {% raw %}{{ messageMap[job.id] }}{% endraw %}
                         </div>
@@ -97,12 +115,17 @@
                     try {
                         const response = await fetch(`/student/job/apply/${jobId}`, {
                             method: 'POST',
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                            headers: {
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'Accept': 'application/json'
+                            }
                         });
                         const data = await response.json();
                         if (response.ok && data.success) {
                             this.appliedJobIds.push(jobId);
-                            this.messageMap[jobId] = data.message || 'You have applied successfully for this job.';
+                            this.messageMap[jobId] = data.message || 'Applying...';
+                            window.location.href = '/student/applications';
+                            return;
                         } else {
                             this.messageMap[jobId] = data.message || 'Unable to apply right now.';
                         }

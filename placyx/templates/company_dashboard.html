@@ -50,13 +50,10 @@
     new Chart(ctx2, {
         type: 'pie',
         data: {
-            labels: ['Shortlisted', 'Selected', 'Rejected'],
+            labels: ['Shortlisted', 'Interview Scheduled', 'Selected', 'Rejected'],
             datasets: [{
-                data: [{{ shortlisted }}, {{ selected }}, {{ rejected }}],
-                backgroundColor: ['#7f3fbf', '#3f51b5', '#6a0dad']
-            }]
-        }
-    });
+                data: [{{ shortlisted }}, {{ interview_scheduled }}, {{ selected }}, {{ rejected }}],
+                backgroundColor: ['#7f3fbf', '#007bff', '#3f51b5', '#6a0dad']
     </script>
 
 {% endblock %}

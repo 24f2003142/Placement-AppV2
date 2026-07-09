@@ -32,6 +32,7 @@
                 <option value="">All statuses</option>
                 <option value="APPLIED">Applied</option>
                 <option value="SHORTLISTED">Shortlisted</option>
+                <option value="INTERVIEW_SCHEDULED">Interview Scheduled</option>
                 <option value="SELECTED">Selected</option>
                 <option value="REJECTED">Rejected</option>
             </select>
@@ -44,6 +45,7 @@
                         <th>Job Title</th>
                         <th>Company</th>
                         <th>Status</th>
+                        <th>Interview</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -53,8 +55,16 @@
                         <td>
                             <span v-if="app.status === 'APPLIED'" class="badge bg-secondary">Applied</span>
                             <span v-else-if="app.status === 'SHORTLISTED'" class="badge bg-warning">Shortlisted</span>
+                            <span v-else-if="app.status === 'INTERVIEW_SCHEDULED'" class="badge bg-primary">Interview Scheduled</span>
                             <span v-else-if="app.status === 'SELECTED'" class="badge bg-success">Selected</span>
                             <span v-else class="badge bg-danger">Rejected</span>
+                        </td>
+                        <td>
+                            <span v-if="app.interview_date">
+                                <strong>Interview:</strong> <span v-text="app.interview_date"></span>
+                                <span v-if="app.interview_mode">(<span v-text="app.interview_mode"></span>)</span>
+                            </span>
+                            <span v-else class="text-muted">Not scheduled</span>
                         </td>
                     </tr>
                 </tbody>
@@ -79,7 +89,9 @@
                             id: {{ app.id }},
                             title: {{ app.job_post.title|tojson }},
                             company: {{ app.job_post.company.name|tojson }},
-                            status: {{ app.status|tojson }}
+                            status: {{ app.status|tojson }},
+                            interview_date: {{ (app.interview_date.strftime('%Y-%m-%d %H:%M') if app.interview_date else '')|tojson }},
+                            interview_mode: {{ app.interview_mode|tojson }}
                         }{% if not loop.last %},{% endif %}
                         {% endfor %}
                     ]
