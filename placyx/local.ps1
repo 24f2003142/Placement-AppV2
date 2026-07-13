@@ -44,10 +44,10 @@ if (-Not (Test-Path "venv")) {
 .\venv\Scripts\Activate.ps1
 
 # Step 3: Upgrade pip
-pip install --upgrade pip
+.\venv\Scripts\python.exe -m pip install --upgrade pip
 
 # Step 4: Install dependencies
-pip install -r requirements.txt
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
 
 function Wait-ForRedis {
     param(
