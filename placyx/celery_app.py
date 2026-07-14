@@ -23,7 +23,7 @@ def make_celery():
     # Support a temporary demo schedule (every 5 minutes) when enabled via env var.
     demo_enabled = os.environ.get("DEMO_SCHEDULE_ENABLED", "true").lower() in ("1", "true", "yes")
     if demo_enabled:
-        print("[DEMOSCHED] Demo schedule enabled: running reminder every 5 minutes")
+        print("[DEMOSCHED] Demo schedule enabled: running reminder every 1 minutes")
         reminder_sched = schedule(60)  # every 60 seconds (1 minute)
     else:
         reminder_sched = crontab(hour=Config.DAILY_REMINDER_HOUR, minute=Config.DAILY_REMINDER_MINUTE)

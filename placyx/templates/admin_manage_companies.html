@@ -102,20 +102,32 @@
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
           });
 
+          console.log('Response status:', response.status);
+          console.log('Response headers:', response.headers.get('content-type'));
+
+          if (!response.ok) {
+            throw new Error(`HTTP Error: ${response.status}`);
+          }
+
           let data = null;
           const contentType = response.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
             data = await response.json();
+            console.log('Response data:', data);
+          } else {
+            throw new Error('Expected JSON response');
           }
 
-          if (!response.ok || !data?.success) {
+          if (!data?.success) {
             throw new Error(data?.message || 'Action failed');
           }
 
           // Only update state after successful API response
           this.activeMap[companyId] = data.active;
+          console.log('Company', companyId, 'toggled. New active state:', data.active);
         } catch (error) {
-          console.error(error);
+          console.error('Toggle error:', error);
+          alert('Error: ' + error.message);
         } finally {
           this.loadingId = null;
         }

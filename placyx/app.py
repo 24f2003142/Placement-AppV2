@@ -357,6 +357,7 @@ def create_app():
         company = Company.query.get_or_404(company_id)
         company.approval_status = "APPROVED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Company approved"})
@@ -371,6 +372,7 @@ def create_app():
         company = Company.query.get_or_404(company_id)
         company.approval_status = "REJECTED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Company rejected"})
@@ -403,6 +405,7 @@ def create_app():
         student = Student.query.get_or_404(student_id)
         student.user.is_active = False
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Student deactivated", "active": False})
@@ -417,6 +420,7 @@ def create_app():
         student = Student.query.get_or_404(student_id)
         student.user.is_active = True
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Student activated", "active": True})
@@ -450,6 +454,7 @@ def create_app():
         company = Company.query.get_or_404(company_id)
         company.user.is_active = False
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Company deactivated", "active": False})
@@ -465,6 +470,7 @@ def create_app():
         company.user.is_active = True
         company.approval_status = "APPROVED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Company activated", "active": True})
@@ -491,6 +497,7 @@ def create_app():
         job = JobPost.query.get_or_404(job_id)
         job.status = "APPROVED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Job approved successfully"})
@@ -506,6 +513,7 @@ def create_app():
         job = JobPost.query.get_or_404(job_id)
         job.status = "REJECTED"
         db.session.commit()
+        cache.clear()
 
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
             return jsonify({"success": True, "message": "Job rejected successfully"})
@@ -571,6 +579,12 @@ def create_app():
         company = current_user.company
 
         jobs = JobPost.query.filter_by(company_id=company.id).all()
+        
+        print(f"[DEBUG] Company Dashboard - Company ID: {company.id}, Total Jobs: {len(jobs)}")
+        if len(jobs) == 0:
+            print(f"[DEBUG] No jobs found. All jobs in DB: {JobPost.query.count()}")
+            for job in JobPost.query.all():
+                print(f"[DEBUG] Job ID: {job.id}, Company ID: {job.company_id}, Title: {job.title}")
 
         total_jobs = len(jobs)
         total_applications = Application.query.join(JobPost).filter(
@@ -617,6 +631,13 @@ def create_app():
 
         if request.method == "POST":
             try:
+                # Verify company exists
+                if not current_user.company:
+                    raise ValueError("Company not found for this user")
+                
+                if not current_user.company.id:
+                    raise ValueError("Company ID is not set")
+                
                 cgpa_value = request.form.get("min_cgpa") or None
                 job = JobPost(
                     company_id=current_user.company.id,
@@ -632,14 +653,18 @@ def create_app():
                 )
                 db.session.add(job)
                 db.session.commit()
+                cache.clear()
+                
+                print(f"[DEBUG] Job created successfully: ID={job.id}, Company={current_user.company.id}")
 
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return jsonify({"success": True, "message": "Job posted successfully", "redirect": url_for("company_dashboard")})
                 return redirect(url_for("company_dashboard"))
             except Exception as e:
+                print(f"[ERROR] Job creation failed: {str(e)}")
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
-                    return jsonify({"success": False, "message": str(e)}), 400
-                flash("Error creating job post", "error")
+                    return jsonify({"success": False, "message": f"Error: {str(e)}"}), 400
+                flash(f"Error creating job post: {str(e)}", "error")
 
         return render_template("company_create_job.html")
 
@@ -841,6 +866,7 @@ def create_app():
                     company.logo = filename
 
                 db.session.commit()
+                cache.clear()
                 
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return jsonify({"success": True, "message": "Profile updated successfully", "redirect": url_for("company_dashboard")})
@@ -926,6 +952,7 @@ def create_app():
                     student.resume_path = filename
 
                 db.session.commit()
+                cache.clear()
 
                 if request.headers.get("X-Requested-With") == "XMLHttpRequest":
                     return jsonify({"success": True, "message": "Profile updated successfully", "redirect": url_for("student_dashboard")})

@@ -45,15 +45,41 @@
             </div>
 
     <script>
-    const ctx2 = document.getElementById('applicationChart');
+      const ctx2 = document.getElementById('applicationChart');
+      const applicationData = [
+        {{ shortlisted or 0 }},
+        {{ interview_scheduled or 0 }},
+        {{ selected or 0 }},
+        {{ rejected or 0 }}
+      ];
 
-    new Chart(ctx2, {
+      new Chart(ctx2, {
         type: 'pie',
         data: {
-            labels: ['Shortlisted', 'Interview Scheduled', 'Selected', 'Rejected'],
-            datasets: [{
-                data: [{{ shortlisted }}, {{ interview_scheduled }}, {{ selected }}, {{ rejected }}],
-                backgroundColor: ['#7f3fbf', '#007bff', '#3f51b5', '#6a0dad']
+          labels: ['Shortlisted', 'Interview Scheduled', 'Selected', 'Rejected'],
+          datasets: [{
+            data: applicationData,
+            backgroundColor: ['#7f3fbf', '#007bff', '#3f51b5', '#6a0dad'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom'
+            },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return context.label + ': ' + context.parsed;
+                }
+              }
+            }
+          }
+        }
+      });
     </script>
 
 {% endblock %}

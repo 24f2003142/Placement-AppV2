@@ -2,10 +2,17 @@
 {% block title %}Candidate Details{% endblock %}
 
 {% block sidebar %}
-<a href="/company/dashboard">📊 Dashboard</a>
-<a href="/company/jobs">📄 My Jobs</a>
-<a href="/company/profile">⚙ Edit Profile</a>
-<a href="/logout">🚪 Logout</a>
+    {% if current_user.company.logo %}
+      <div class="text-center py-3">
+          <img src="{{ url_for('static', filename='uploads/' + current_user.company.logo) }}"
+              width="140"
+              class="img-fluid">
+      </div>
+    {% endif %}
+    <a href="/company/dashboard">📊 Dashboard</a>
+    <a href="/company/jobs">📄 My Jobs</a>
+    <a href="/company/profile">⚙ Edit Profile</a>
+    <a href="/logout">🚪 Logout</a>
 {% endblock %}
 
 {% block content %}
@@ -163,7 +170,7 @@
           });
           const data = await response.json();
           if (response.ok && data.success) {
-            this.message = data.message || 'Status updated successfully.';
+            this.message = data.message || 'Updated successfully. Redirecting...';
             this.messageType = 'success';
             setTimeout(() => {
               window.location.href = this.backUrl;
@@ -197,7 +204,7 @@
           });
           const data = await response.json();
           if (response.ok && data.success) {
-            this.message = data.message || 'Interview scheduled successfully.';
+            this.message = data.message || 'Interview scheduled. Redirecting...';
             this.messageType = 'success';
             setTimeout(() => {
               window.location.href = this.backUrl;

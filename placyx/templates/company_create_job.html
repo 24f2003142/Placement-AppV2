@@ -57,8 +57,12 @@
           <input 
             v-model="form.deadline" 
             class="form-control mb-3" 
-            type="date" 
+            type="date"
+            :min="minDate"
             required>
+          <small v-if="form.deadline && !isValidDate" class="text-danger d-block mb-2">
+            ⚠️ Application deadline cannot be earlier than today
+          </small>
 
           <button 
             type="submit" 
@@ -90,10 +94,32 @@
           messageType: 'success'
         };
       },
+      computed: {
+        minDate() {
+          // Get today's date in YYYY-MM-DD format
+          const today = new Date();
+          const year = today.getFullYear();
+          const month = String(today.getMonth() + 1).padStart(2, '0');
+          const day = String(today.getDate()).padStart(2, '0');
+          return `${year}-${month}-${day}`;
+        },
+        isValidDate() {
+          // Check if deadline is not earlier than today
+          if (!this.form.deadline) return true;
+          return this.form.deadline >= this.minDate;
+        }
+      },
       methods: {
         async submitJob() {
           if (!this.form.title || !this.form.deadline) {
             this.message = 'Job Title and Deadline are required';
+            this.messageType = 'error';
+            return;
+          }
+
+          // Validate deadline is not in the past
+          if (!this.isValidDate) {
+            this.message = 'Application deadline cannot be earlier than today. Please select a valid date.';
             this.messageType = 'error';
             return;
           }
